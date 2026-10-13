@@ -1,0 +1,7 @@
+{
+  "name": "tag-it-on",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./out"
+  }
+}
