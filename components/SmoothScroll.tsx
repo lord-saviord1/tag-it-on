@@ -2,16 +2,13 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
+import { driver } from "@/lib/lenisDriver";
 
 /**
- * Mounts once in the root layout. Drives the whole page's inertial smooth scroll —
- * this is the "premium/cinematic" scroll feel from Bullet's site.
- *
- * To add a literal infinite/looping scroll later: Lenis exposes `scroll` and `limit`
- * on every `scroll` event — wrap content in a duplicated track and use those values to
- * jump the scroll position back by one track-height when you cross a boundary, the same
- * way the header marquee loops today via CSS. Keeping Lenis as the single scroll driver
- * now means that loop logic only has to live in one place later.
+ * Mounts once in the root layout. Drives the page's inertial smooth scroll.
+ * Normally the 3D scene calls lenis.raf() (see SceneCanvas) so scroll and bottles
+ * stay frame-perfect; this loop only steps in if the scene is not running.
+ * Also makes every #anchor link glide to its section.
  */
 export default function SmoothScroll() {
   useEffect(() => {
@@ -20,15 +17,36 @@ export default function SmoothScroll() {
       easing: (t: number) => 1 - Math.pow(1 - t, 3),
       smoothWheel: true,
     });
+    driver.lenis = lenis;
 
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-    const id = requestAnimationFrame(raf);
+    let id = 0;
+    const loop = (time: number) => {
+      if (performance.now() - driver.lastExternal > 120) {
+        lenis.raf(time);
+      }
+      id = requestAnimationFrame(loop);
+    };
+    id = requestAnimationFrame(loop);
+
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest("a[href^='#']") as HTMLAnchorElement | null;
+      if (!a) return;
+      const hash = a.getAttribute("href");
+      if (!hash || hash === "#") {
+        e.preventDefault();
+        return;
+      }
+      const el = document.querySelector(hash) as HTMLElement | null;
+      if (!el) return;
+      e.preventDefault();
+      lenis.scrollTo(el, { offset: -64 });
+    };
+    document.addEventListener("click", onClick);
 
     return () => {
+      document.removeEventListener("click", onClick);
       cancelAnimationFrame(id);
+      driver.lenis = null;
       lenis.destroy();
     };
   }, []);

@@ -1,16 +1,21 @@
-import BottleStage from "./Bottle";
+import type { CSSProperties } from "react";
+import BottleSlot from "./BottleSlot";
 import type { Scent } from "@/lib/scents";
 
-export default function ScentSection({ scent, id }: { scent: Scent; id?: string }) {
+export default function ScentSection({ scent }: { scent: Scent }) {
+  const vars = { "--c1": scent.accent, "--c2": scent.accentDeep } as CSSProperties;
   return (
-    <section className={`scent ${scent.className} ${scent.flip ? "flip" : ""}`} id={id}>
+    <section className={`scent ${scent.flip ? "flip" : ""}`} id={`scent-${scent.slug}`} style={vars}>
+      <div className="bg-word" aria-hidden="true">
+        {scent.name}
+      </div>
       <div className="wrap">
         <div className="scent-copy">
-          <div className="scent-tag reveal">FRAGRANCE {scent.index}</div>
+          <div className="scent-tag reveal">FRAGRANCE {scent.index} / 07</div>
           <h3 className="reveal">{scent.name}</h3>
           <p className="reveal">{scent.description}</p>
-          <a href="#" className="scent-link reveal">
-            See the range →
+          <a href="#range" className="scent-link reveal">
+            See the full range →
           </a>
           <div className="scent-facts reveal">
             {scent.facts.map((f) => (
@@ -21,13 +26,8 @@ export default function ScentSection({ scent, id }: { scent: Scent; id?: string 
             ))}
           </div>
         </div>
-        <div className="scent-art reveal">
-          <BottleStage
-            topColor={scent.topColor}
-            bottomColor={scent.bottomColor}
-            label={scent.name}
-            badge={scent.badge}
-          />
+        <div className="scent-art">
+          <BottleSlot colors={scent} label={scent.name} />
         </div>
       </div>
     </section>

@@ -3,9 +3,10 @@ import SmoothScroll from "@/components/SmoothScroll";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  robots: { index: false, follow: false },
   title: "TAG | Don't Troll, Just TAG It On",
   description:
-    "Seven fragrances built for Lagos heat, campus deadlines and everything after. TAG roll-on — 48-hour protection, priced for real life.",
+    "TAG Ultra Dry roll-on deodorant: seven fragrances, a quick-dry formula and up to 48 hours of protection. Don't Troll, Just TAG It On.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

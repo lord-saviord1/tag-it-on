@@ -1,18 +1,21 @@
-import BottleStage from "./Bottle";
+import BottleSlot from "./BottleSlot";
+import { scents } from "@/lib/scents";
 
 const stats = [
-  { num: "48HRS", lbl: "protection, guaranteed" },
-  { num: "7", lbl: "fragrances, one for every mood" },
-  { num: "₦1,300", lbl: "starting price, no compromise" },
-  { num: "20+", lbl: "years on Nigerian shelves" },
+  { num: "48HRS", lbl: "of protection, up to, in every fragrance" },
+  { num: "7", lbl: "fragrances for different moods" },
+  { num: "ULTRA DRY", lbl: "quick-dry formula" },
+  { num: "#TAGItOn", lbl: "Don't Troll, Just TAG It On" },
 ];
 
 export default function Hero() {
+  const base = scents.find((x) => x.slug === "whitening") ?? scents[0];
+  const colors = { ...base, accent: "#2a4bff", accentDeep: "#0f1f8f" };
   return (
     <section className="hero">
-      <div className="wrap">
+      <div className="wrap hero-top">
         <div>
-          <div className="hero-eyebrow reveal">EST. 2005 — LAGOS, NIGERIA</div>
+          <div className="hero-eyebrow reveal">ULTRA DRY ROLL-ON · BY IMPERIO INTERNATIONAL</div>
           <h1 className="reveal">
             DON&apos;T
             <br />
@@ -23,17 +26,21 @@ export default function Hero() {
             IT ON
           </h1>
         </div>
-        <div className="hero-bottle-wrap reveal">
-          <BottleStage topColor="#ffffff" bottomColor="#1c3fff" label="TAG" badge="EST. 2005" />
+        <div className="hero-bottle-wrap">
+          <BottleSlot colors={colors} label="TAG" />
         </div>
       </div>
       <div className="wrap hero-copy reveal">
-        Seven fragrances built for Lagos heat, campus deadlines and everything after. 48-hour
-        protection, priced so you never have to choose between smelling good and getting by.
+        Seven fragrances for seven moods. Every TAG roll-on has an ultra-dry, quick-dry formula and up
+        to 48 hours of protection, at a price that doesn&apos;t break the bank.
       </div>
       <div className="wrap hero-actions reveal">
-        <button className="btn-primary">Shop the range</button>
-        <button className="btn-ghost">Take the scent quiz</button>
+        <a href="#range" className="btn-primary">
+          Shop the range
+        </a>
+        <button className="btn-ghost" data-open-quiz="">
+          Find your scent
+        </button>
       </div>
       <div className="wrap hero-stats reveal">
         {stats.map((s) => (

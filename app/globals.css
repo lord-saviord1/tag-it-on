@@ -45,8 +45,7 @@ button{font-family:inherit;cursor:pointer;}
 /* ---------- header ---------- */
 header{
   position:sticky; top:0; z-index:50;
-  background:rgba(238,240,244,0.86);
-  backdrop-filter: blur(10px);
+  background:rgba(238,240,244,0.97);
   border-bottom:1px solid var(--line);
 }
 .nav{
@@ -108,10 +107,8 @@ header{
 .marquee-track span::after{content:"—"; opacity:0.4;}
 @keyframes scroll-left{ from{transform:translateX(0);} to{transform:translateX(-50%);} }
 
-/* ---------- 3D bottle stage ---------- */
-.bottle-3d-stage{ position:relative; width:100%; max-width:280px; aspect-ratio: 3 / 5; margin:0 auto; touch-action: pan-y; }
-.bottle-3d-stage canvas{ width:100% !important; height:100% !important; display:block; cursor:grab; }
-.bottle-3d-stage:active canvas{ cursor:grabbing; }
+/* ---------- bottle slot (the single 3D bottle sits on top of these) ---------- */
+.bottle-slot{ position:relative; width:100%; max-width:280px; aspect-ratio: 3 / 5; margin:0 auto; }
 
 /* ---------- section shell ---------- */
 .intro{ padding:90px 0 60px; }
@@ -121,8 +118,8 @@ header{
 .intro p{font-size:16.5px; line-height:1.6; color:rgba(18,20,26,0.72); max-width:560px;}
 
 /* ---------- scent sections ---------- */
-.scent{ position:relative; color:var(--white); overflow:hidden; }
-.scent .wrap{ display:grid; grid-template-columns: 1fr 1fr; align-items:center; min-height:600px; gap:36px; padding:70px 32px; }
+.scent{ position:relative; color:var(--white); overflow:hidden; background:linear-gradient(160deg,var(--c1,#2244ff),var(--c2,#0f1f8f)); }
+.scent .wrap{ display:grid; grid-template-columns: 1fr 1fr; align-items:center; min-height:100vh; min-height:100svh; gap:36px; padding:70px 32px; position:relative; z-index:2; }
 .scent.flip .scent-art{order:2;}
 .scent.flip .scent-copy{order:1;}
 .scent-tag{ font-size:13px; font-weight:700; letter-spacing:0.12em; opacity:0.8; padding-bottom:14px; }
@@ -135,10 +132,6 @@ header{
 .scent-facts .f-num{font-family:'Anton'; font-size:19px;}
 .scent-facts .f-lbl{font-size:11px; opacity:0.75; letter-spacing:0.03em; padding-top:2px;}
 
-.scent.mint{background:linear-gradient(160deg,#1c3fff,#0f1f8f);}
-.scent.turbo{background:linear-gradient(160deg,#ff5b3c,#c22c14);}
-.scent.breeze{background:linear-gradient(160deg,#12c7b4,#036357);}
-.scent.charm{background:linear-gradient(160deg,#ff5fa2,#a3164f);}
 
 /* ---------- range strip ---------- */
 .range{ background:var(--ink); color:var(--white); padding:80px 0; }
@@ -180,7 +173,7 @@ footer{background:var(--ink); color:rgba(255,255,255,0.72); padding:50px 0 26px;
   .hero .wrap{grid-template-columns:1fr; align-items:start; padding:0 22px;}
   .hero-bottle-wrap{justify-self:center; margin-top:8px; width:min(220px, 58vw);}
   .scent .wrap{grid-template-columns:1fr; padding:54px 22px; min-height:0;}
-  .scent .bottle-3d-stage{max-width:220px; margin-bottom:10px;}
+  .scent .bottle-slot{max-width:220px; margin-bottom:10px;}
   .scent.flip .scent-art{order:1;} .scent.flip .scent-copy{order:2;}
   .range-grid{grid-template-columns:repeat(2,1fr);}
   .range-card{padding:20px 16px;}
@@ -191,4 +184,91 @@ footer{background:var(--ink); color:rgba(255,255,255,0.72); padding:50px 0 26px;
 @media (max-width: 420px){
   .hero-stats div{flex:1 1 50%; border-right:none; border-bottom:1px solid rgba(255,255,255,0.22);}
   .hero-stats div:nth-child(odd){border-right:1px solid rgba(255,255,255,0.22);}
+}
+
+.showcase-note{ font-size:12px; line-height:1.55; color:rgba(255,255,255,0.55); max-width:640px; padding:20px 0 4px; }
+
+.range-photo img{ width:100%; border-radius:14px; display:block; }
+.range-photo p{ font-size:11.5px; color:rgba(255,255,255,0.5); padding:10px 0 36px; }
+
+/* ================= depth, layering and polish ================= */
+a.btn-primary, a.btn-ghost{ display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.logo{ cursor:pointer; }
+.range-card{ color:inherit; cursor:pointer; }
+
+/* hero: richer background, headline sits BEHIND the 3D bottle */
+.hero{
+  background:
+    radial-gradient(60% 60% at 72% 38%, rgba(255,255,255,0.24), transparent 70%),
+    linear-gradient(170deg, #2a4bff, #0f1f8f);
+}
+.hero .wrap.hero-top{ z-index:0; }
+@media (min-width: 861px){
+  .hero-bottle-wrap{ width:min(400px, 34vw); margin-left:-70px; }
+  .hero-bottle-wrap .bottle-slot{ max-width:400px; }
+}
+
+/* fragrance sections: giant word behind the bottle, soft highlight on the bottle's side */
+.scent{
+  background:
+    radial-gradient(55% 60% at 72% 38%, rgba(255,255,255,0.22), transparent 70%),
+    linear-gradient(160deg, var(--c1, #2244ff), var(--c2, #0f1f8f));
+}
+.scent.flip{
+  background:
+    radial-gradient(55% 60% at 28% 38%, rgba(255,255,255,0.22), transparent 70%),
+    linear-gradient(160deg, var(--c1, #2244ff), var(--c2, #0f1f8f));
+}
+.scent .bg-word{
+  position:absolute; left:0; right:0; top:50%; transform:translateY(-50%);
+  font-family:'Anton', sans-serif; text-transform:uppercase; text-align:center;
+  font-size:clamp(88px, 18vw, 280px); line-height:0.85; padding:0 3vw;
+  color:rgba(255,255,255,0.1); z-index:0; pointer-events:none; user-select:none;
+}
+.scent .scent-art{ position:relative; }
+/* alternate which side the bottle sits on (bottle left on flipped sections) */
+.scent.flip .scent-art{ order:-1; }
+.scent.flip .scent-copy{ order:0; }
+@media (max-width: 860px){
+  .scent .scent-art{ order:-1; }
+  .scent.flip .scent-art{ order:-1; }
+}
+
+/* fine film grain over everything for a less flat, more tactile look */
+body::after{
+  content:""; position:fixed; inset:0; z-index:90; pointer-events:none; opacity:0.05;
+  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.range-photo img{ width:100%; border-radius:14px; display:block; }
+.range-photo p{ font-size:11.5px; color:rgba(255,255,255,0.5); padding:10px 0 36px; }
+.foot-bottom a{ text-decoration:underline; text-underline-offset:3px; }
+
+/* ---------- find-your-scent quiz ---------- */
+.quiz-overlay{
+  position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center;
+  padding:20px; background:rgba(10,12,22,0.72);
+}
+.quiz-card{
+  position:relative; width:100%; max-width:520px; background:var(--white); color:var(--ink);
+  border-radius:22px; padding:34px 30px 30px; box-shadow:0 30px 80px rgba(0,0,0,0.4);
+}
+.quiz-card h3{ font-size:clamp(28px, 6vw, 40px); padding:10px 0 20px; }
+.quiz-card p{ font-size:15px; line-height:1.55; color:rgba(18,20,26,0.72); padding-bottom:22px; }
+.quiz-step{ font-size:12px; font-weight:700; letter-spacing:0.14em; color:var(--blue); }
+.quiz-close{
+  position:absolute; top:14px; right:16px; background:none; border:none; font-size:30px; line-height:1;
+  color:rgba(18,20,26,0.5);
+}
+.quiz-options{ display:grid; gap:10px; }
+.quiz-options button{
+  text-align:left; padding:15px 18px; border-radius:14px; font-size:15px; font-weight:600;
+  background:var(--paper); border:1.5px solid var(--line); color:var(--ink); transition:border-color .15s, transform .15s;
+}
+.quiz-options button:hover{ border-color:var(--blue); transform:translateY(-1px); }
+.quiz-actions{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.quiz-card .btn-primary{ background:var(--ink); color:var(--white); }
+.quiz-link{
+  background:none; border:none; font-size:14px; font-weight:700; color:var(--blue-deep);
+  text-decoration:underline; text-underline-offset:3px; cursor:pointer;
 }

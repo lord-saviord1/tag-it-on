@@ -7,25 +7,28 @@ GitHub and Cloudflare do the building for you in the cloud. You only click and d
 1. Unzip `tag-nextjs.zip`. GitHub does **not** unzip files for you.
 2. On github.com click **New repository**, name it `tag-it-on`, create it.
 3. On the empty repo page click **uploading an existing file**.
-4. Open the unzipped folder and drag its **contents** into the page: `app`, `components`, `lib`, `package.json`, `tsconfig.json`, `next.config.mjs`, `.node-version`, and the rest. Do not drag the outer `tag-nextjs` folder itself, or the project ends up nested one level down.
+4. Open the unzipped folder and drag its **contents** into the page: `app`, `components`, `lib`, `package.json`, `tsconfig.json`, `next.config.mjs`, `wrangler.jsonc`, `.node-version`, and the rest. Do not drag the outer `tag-nextjs` folder itself, or the project ends up nested one level down.
 5. Click **Commit changes**.
 
 (If `.node-version` or `.gitignore` are hidden on your computer, skip them. On Mac, press Cmd+Shift+. to show hidden files.)
 
 ## 2. Build and host on Cloudflare
 
-1. Cloudflare dashboard > **Workers & Pages** > **Create** > **Pages** > **Connect to Git**. Pick the `tag-it-on` repo.
-2. Build settings:
-   - Framework preset: **Next.js (Static HTML Export)**
-   - Build command: `npx next build`
-   - Build output directory: `out`
-3. **Save and Deploy.** The build runs in the cloud (a few minutes). You get a `something.pages.dev` link.
+Cloudflare's current setup screen is **Workers Builds** (it has a build command and a deploy command, but no output directory). The project includes a `wrangler.jsonc` file that tells Cloudflare to serve the `out` folder.
 
-Every time you upload a change to GitHub, Cloudflare rebuilds and redeploys by itself.
+1. Cloudflare dashboard > **Workers & Pages** > **Create** > import your `tag-it-on` GitHub repo.
+2. Fill in:
+   - Project name: `tag-it-on` (must match the `name` line in `wrangler.jsonc`; if you pick another name, edit that line on GitHub)
+   - Build command: `npx next build`
+   - Deploy command: `npx wrangler deploy`
+   - Preview / non-production command: leave the default (`npx wrangler versions upload`)
+3. **Save and Deploy.** The build runs in the cloud (a few minutes). You get a `something.workers.dev` link.
+
+Every time you commit a change to GitHub, Cloudflare rebuilds and redeploys by itself.
 
 ## 3. Use your own subdomain
 
-In the Pages project open **Custom domains** > **Set up a custom domain** and type the subdomain you want, for example `tag.yourdomain.com`. Your domain is already on Cloudflare, so it creates the DNS record for you.
+In the project open **Settings** > **Domains & Routes** > **Add** > **Custom domain** and type the subdomain you want, for example `tag.yourdomain.com`. Your domain is already on Cloudflare, so it creates the DNS record for you.
 
 Put that final link in the proposal PDF.
 

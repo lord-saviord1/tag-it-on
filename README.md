@@ -15,7 +15,7 @@ Then open http://localhost:3000.
 ## Structure
 
 - `app/` — Next.js App Router: `layout.tsx` (fonts + global Lenis mount), `page.tsx` (assembles the page), `globals.css` (all design tokens/styles, ported from the prototype).
-- `components/Bottle.tsx` — the actual 3D bottle: R3F `<Canvas>`, physical materials, a canvas-generated label texture, a floating badge, drag-to-orbit with idle auto-rotate. Pauses its render loop when scrolled out of view.
+- `components/SceneCanvas.tsx` — the single 3D bottle. One WebGL scene sits behind the page, glides to each `BottleSlot` as you scroll, and swaps to that scent's label.
 - `components/ScentSection.tsx` + `lib/scents.ts` — each fragrance section is generated from one data object. **Add a new scent by adding one entry to `lib/scents.ts`** — no JSX changes needed. This is the "scale it up" seam.
 - `components/SmoothScroll.tsx` — mounts Lenis once in the root layout for the cinematic scroll feel.
 - `components/Header.tsx` — nav with a working mobile menu (the prototype's mobile bug is fixed here).

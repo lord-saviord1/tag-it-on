@@ -1,16 +1,17 @@
-import { fullRange } from "@/lib/scents";
+import { scents } from "@/lib/scents";
+import { links, socialLabels } from "@/lib/links";
 
 export function Story() {
   return (
     <section className="intro" id="story">
       <div className="wrap">
-        <div className="kicker reveal">OUR STORY</div>
-        <h2 className="reveal">Kindness smells better than a comeback.</h2>
+        <div className="kicker reveal">THE IDEA</div>
+        <h2 className="reveal">TAG is the friend who plugs you.</h2>
         <p className="reveal">
-          TAG started as a fragrance built for people on the move — traders, students, dancers,
-          anyone whose day doesn&apos;t stop at 9 to 5. Twenty years on, we&apos;re still making
-          the same promise: real protection, real fragrance, priced for real life. No troll
-          deserves your energy. Save it, and TAG it on instead.
+          TAG is a roll-on deodorant from Imperio International, made for young Nigerians who want to
+          look good, feel good and step out with confidence. It&apos;s premium, it&apos;s affordable,
+          and it comes in seven fragrances so you can pick the one that fits your mood. So instead of
+          trolling someone, just TAG it on.
         </p>
       </div>
     </section>
@@ -23,17 +24,29 @@ export function RangeGrid() {
       <div className="wrap">
         <div className="kicker reveal">THE FULL RANGE</div>
         <h2 className="reveal">Seven scents. One protection promise.</h2>
+        <div className="range-photo reveal">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/tag-range.jpeg"
+            alt="The TAG Ultra Dry roll-on range: Cool Breeze, Turbo, Whitening, Powerful Defense, Fresh Mint, Sensitive Skin and Romantic Charm"
+          />
+          <p>Product photography belongs to TAG / Imperio International. Shown here for showcase purposes only.</p>
+        </div>
       </div>
       <div className="range-grid">
-        {fullRange.map((r) => (
-          <div className="range-card reveal" key={r.name}>
+        {scents.map((r) => (
+          <a href={`#scent-${r.slug}`} className="range-card reveal" key={r.slug}>
             <div>
-              <div className="swatch" style={{ background: r.color }} />
+              <div className="swatch" style={{ background: r.accent }} />
               <div className="name">{r.name}</div>
             </div>
-            <div className="desc">{r.desc}</div>
-          </div>
+            <div className="desc">{r.tagline}</div>
+          </a>
         ))}
+        <a href={links.jumia} target="_blank" rel="noopener noreferrer" className="range-card reveal">
+          <div className="name">Buy on Jumia</div>
+          <div className="desc">Shop TAG online →</div>
+        </a>
       </div>
     </section>
   );
@@ -43,15 +56,15 @@ export function Proof() {
   const cards = [
     {
       big: "#TAGItOn",
-      cap: "Rallied across Falomo, Surulere, Yaba and Ikeja — a street campaign built on one idea: don't troll, TAG it on instead.",
+      cap: "The Don't Troll, Just TAG It On rally took over Falomo, Surulere, Tejuosho, Maryland and Ikeja Underbridge with a message of kindness over trolling.",
     },
     {
       big: "Campus-first",
-      cap: "From YabaTech to Ikeja City Mall, TAG shows up where young Nigerians actually are — not just on shelves.",
+      cap: "TAG takes the brand to students, like the Yaba College of Technology activation with dance, skipping and snooker competitions.",
     },
     {
-      big: "Pocket-friendly",
-      cap: "Premium protection at street prices. You shouldn't have to choose between smelling good and getting through the month.",
+      big: "Affordable luxury",
+      cap: "Premium quality at a pocket-friendly price. You don't have to break the bank to own one, or to gift one.",
     },
   ];
   return (
@@ -78,12 +91,15 @@ export function Cta() {
           ON
         </h2>
         <p className="reveal">
-          Find your fragrance at any Jumia store, roadside vendor, or the nearest supermarket near
-          you.
+          Shop TAG roll-ons on Jumia Nigeria, or take the quiz to find your fragrance first.
         </p>
         <div className="hero-actions reveal" style={{ justifyContent: "center" }}>
-          <button className="btn-primary">Find a store</button>
-          <button className="btn-ghost">Take the scent quiz</button>
+          <a href={links.jumia} target="_blank" rel="noopener noreferrer" className="btn-primary">
+            Buy on Jumia
+          </a>
+          <button className="btn-ghost" data-open-quiz="">
+            Find your scent
+          </button>
         </div>
       </div>
     </section>
@@ -91,14 +107,15 @@ export function Cta() {
 }
 
 export function Footer() {
+  const socials = Object.entries(links.social).filter(([, url]) => url);
   return (
     <footer>
       <div className="wrap">
         <div className="foot-top">
           <div>
             <div className="foot-logo">TAG</div>
-            <p style={{ maxWidth: 220, opacity: 0.6 }}>
-              Imperio International Ltd — Lagos, Nigeria. Est. 2005.
+            <p style={{ maxWidth: 240, opacity: 0.6 }}>
+              Ultra Dry roll-on deodorant, by Imperio International Limited.
             </p>
           </div>
           <div className="foot-cols">
@@ -106,24 +123,35 @@ export function Footer() {
               <h4>Explore</h4>
               <a href="#fragrances">Fragrances</a>
               <a href="#range">The Range</a>
-              <a href="#story">Our Story</a>
+              <a href="#story">The Idea</a>
               <a href="#find">Where to Buy</a>
             </div>
             <div className="foot-col">
-              <h4>Contact</h4>
-              <a href="mailto:hello@tagitonng.com">hello@tagitonng.com</a>
-              <p>Lagos, Nigeria</p>
+              <h4>Shop</h4>
+              <a href={links.jumia} target="_blank" rel="noopener noreferrer">
+                TAG on Jumia
+              </a>
             </div>
-            <div className="foot-col">
-              <h4>Follow</h4>
-              <a href="#">Instagram</a>
-              <a href="#">TikTok</a>
-              <a href="#">Twitter/X</a>
-            </div>
+            {socials.length > 0 && (
+              <div className="foot-col">
+                <h4>Follow</h4>
+                {socials.map(([key, url]) => (
+                  <a key={key} href={url} target="_blank" rel="noopener noreferrer">
+                    {socialLabels[key] ?? key}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+        <p className="showcase-note">
+          Independent showcase site prepared as a design proposal for Imperio International Ltd / TAG.
+          This is not an official TAG website and is not made for commercial activity.
+        </p>
         <div className="foot-bottom">
-          <span>© 2026 TAG. All rights reserved.</span>
+          <span>
+            Showcase design by <a href="https://cipherpr.tech" target="_blank" rel="noopener noreferrer">Cipher PR</a>
+          </span>
           <span>Don&apos;t Troll, Just TAG It On.</span>
         </div>
       </div>

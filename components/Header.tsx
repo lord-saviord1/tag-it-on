@@ -8,17 +8,17 @@ export default function Header() {
   const links = [
     { href: "#fragrances", label: "Fragrances" },
     { href: "#range", label: "The Range" },
-    { href: "#story", label: "Our Story" },
+    { href: "#story", label: "The Idea" },
     { href: "#find", label: "Where to Buy" },
   ];
 
   return (
     <header>
       <div className="nav">
-        <div className="logo">
+        <a href="#top" className="logo">
           <span className="dot" />
           TAG
-        </div>
+        </a>
         <nav className="nav-links">
           {links.map((l) => (
             <a key={l.href} href={l.href}>
@@ -26,7 +26,9 @@ export default function Header() {
             </a>
           ))}
         </nav>
-        <button className="nav-cta">Find your scent</button>
+        <button className="nav-cta" data-open-quiz="">
+          Find your scent
+        </button>
         <button className="menu-btn" aria-label="Open menu" onClick={() => setOpen((o) => !o)}>
           <span />
           <span />
@@ -39,7 +41,12 @@ export default function Header() {
             {l.label}
           </a>
         ))}
-        <button className="nav-cta" style={{ marginTop: 10, textAlign: "center" }}>
+        <button
+          className="nav-cta"
+          data-open-quiz=""
+          style={{ marginTop: 10, textAlign: "center" }}
+          onClick={() => setOpen(false)}
+        >
           Find your scent
         </button>
       </div>
