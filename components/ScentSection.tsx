@@ -1,11 +1,17 @@
 import type { CSSProperties } from "react";
 import BottleSlot from "./BottleSlot";
-import type { Scent } from "@/lib/scents";
+import { mixHex, type Scent } from "@/lib/scents";
 
 export default function ScentSection({ scent }: { scent: Scent }) {
   const vars = { "--c1": scent.accent, "--c2": scent.accentDeep } as CSSProperties;
   return (
-    <section className={`scent ${scent.flip ? "flip" : ""}`} id={`scent-${scent.slug}`} style={vars}>
+    <section
+      className={`scent ${scent.flip ? "flip" : ""}`}
+      id={`scent-${scent.slug}`}
+      style={vars}
+      data-world={mixHex(scent.accent, scent.accentDeep)}
+      data-haze="1"
+    >
       <div className="bg-word" aria-hidden="true">
         {scent.name}
       </div>

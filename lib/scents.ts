@@ -132,3 +132,11 @@ export const scents: Scent[] = [
     facts,
   },
 ];
+
+/** Blend two #rrggbb colours. Used to tell the 3D scene what colour each section's background is. */
+export function mixHex(a: string, b: string, t = 0.5) {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const ch = (s: number) => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t);
+  return "#" + [16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("");
+}
