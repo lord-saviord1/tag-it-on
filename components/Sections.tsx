@@ -3,7 +3,7 @@ import { links, socialLabels } from "@/lib/links";
 
 export function Story() {
   return (
-    <section className="intro" id="story">
+    <section className="intro" id="story" data-world="#eef0f4" data-haze="0.2">
       <div className="wrap">
         <div className="kicker reveal">THE IDEA</div>
         <h2 className="reveal">TAG is the friend who plugs you.</h2>
@@ -20,7 +20,7 @@ export function Story() {
 
 export function RangeGrid() {
   return (
-    <section className="range" id="range">
+    <section className="range" id="range" data-world="#12141a" data-haze="0.3">
       <div className="wrap">
         <div className="kicker reveal">THE FULL RANGE</div>
         <h2 className="reveal">Seven scents. One protection promise.</h2>
@@ -68,7 +68,7 @@ export function Proof() {
     },
   ];
   return (
-    <section className="proof">
+    <section className="proof" data-world="#e2e5ec" data-haze="0.2">
       <div className="wrap">
         {cards.map((c) => (
           <div className="proof-card reveal" key={c.big}>
@@ -83,7 +83,7 @@ export function Proof() {
 
 export function Cta() {
   return (
-    <section className="cta" id="find">
+    <section className="cta" id="find" data-world="#2244ff" data-haze="0.6">
       <div className="wrap">
         <h2 className="reveal">
           TAG IT
@@ -109,7 +109,7 @@ export function Cta() {
 export function Footer() {
   const socials = Object.entries(links.social).filter(([, url]) => url);
   return (
-    <footer>
+    <footer data-world="#12141a" data-haze="0.3">
       <div className="wrap">
         <div className="foot-top">
           <div>

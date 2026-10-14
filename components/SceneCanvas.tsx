@@ -10,20 +10,28 @@ const CAM_Z = 20;
 const FOV = 30;
 const TAN = Math.tan((FOV * Math.PI) / 360); // tan(fov / 2)
 const PN = 150; // floating particles
+const LAYER_Z = [-4, -8.5, -14]; // near, middle and far layers of background roll-ons
+const UI_SELECTOR = "a, button, input, textarea, select, label, header, .quiz-overlay, [data-open-quiz]";
 
 type Colors = { body: string; ball: string; base: string; trim: string };
 type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string };
+type World = { el: HTMLElement; color: THREE.Color; haze: number };
 type BgSpec = {
   fx: number;
   fy: number;
   z: number;
   s0: number;
+  r: number; // collision radius, world units
+  layer: number;
   spin: number;
   phase: number;
   tilt: number;
   colors: Colors;
   map: THREE.Texture;
 };
+type Phys = { dx: number; dy: number; vx: number; vy: number; rot: number; spinV: number };
+type ScreenInfo = { sx: number; sy: number; rpx: number; z: number };
+type Grab = { i: number; pointerType: string; startX: number; startY: number; moved: boolean };
 type Geos = { shell: THREE.LatheGeometry; bowl: THREE.LatheGeometry; seg: number };
 type MatRefs = {
   body: RefObject<THREE.MeshStandardMaterial>;
@@ -33,10 +41,7 @@ type MatRefs = {
   label: RefObject<THREE.MeshStandardMaterial>;
 };
 
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const wrap = (v: number, r: number) => ((((v + r / 2) % r) + r) % r) - r / 2;
 
 function mulberry32(seed: number) {
@@ -143,12 +148,13 @@ function BottleParts({
   );
 }
 
-/** The whole immersive world, in ONE WebGL scene:
- *  - the hero bottle that glides to whichever [data-bottle-slot] is nearest screen centre
- *  - a halo of light behind it
- *  - a field of bottles floating at different depths behind the content (parallax on
- *    scroll and mouse, fading into the section colour with distance)
- *  - drifting particles for extra depth */
+/** The whole immersive world, in ONE WebGL scene, in three clear layers:
+ *  1. BACK: roll-ons floating on three depth layers (near / middle / far) that fade into the
+ *     section colour with distance. They drift with scroll, push away from the cursor, can be
+ *     dragged and thrown with a mouse (tapped on a phone) and bump into each other.
+ *  2. MIDDLE: the main roll-on. It stays put while sections scroll past and only moves when
+ *     the product changes: it glides across, spins once and swaps to the new fragrance.
+ *  3. FRONT: the page text (HTML, above the canvas). */
 function Scene() {
   const hiGeo = useMemo(() => buildGeos(64), []);
   const loGeo = useMemo(() => buildGeos(28), []);
@@ -157,9 +163,7 @@ function Scene() {
   const mainGroup = useRef<THREE.Group>(null);
   const halo = useRef<THREE.Mesh>(null);
   const haloMat = useRef<THREE.MeshBasicMaterial>(null);
-  const bgGroup = useRef<THREE.Group>(null);
   const bgRefs = useRef<(THREE.Group | null)[]>([]);
-  const ptsMat = useRef<THREE.PointsMaterial>(null);
   const posAttr = useRef<THREE.BufferAttribute>(null);
 
   const bodyMat = useRef<THREE.MeshStandardMaterial>(null);
@@ -170,9 +174,31 @@ function Scene() {
   const refs: MatRefs = { body: bodyMat, ball: ballMat, base: baseMat, trim: trimMat, label: labelMat };
 
   const slots = useRef<Slot[]>([]);
+  const worlds = useRef<World[]>([]);
   const textures = useRef<THREE.CanvasTexture[]>([]);
-  const mouse = useRef({ x: 0, y: 0 });
-  const st = useRef({ index: -1, spin: 0, scale: 0, bg: 0, tilt: 0, lastScroll: 0 });
+  const phys = useRef<Phys[]>([]);
+  const screen = useRef<ScreenInfo[]>([]);
+  const posX = useRef<number[]>([]);
+  const posY = useRef<number[]>([]);
+  const grab = useRef<Grab | null>(null);
+  const mouse = useRef({ x: 0, y: 0, cx: 0, cy: 0, type: "mouse", t: 0, overUI: false });
+  const cursor = useRef("");
+  const st = useRef({
+    index: -1,
+    pending: -1,
+    swapAt: 0,
+    spin: 0,
+    tilt: 0,
+    lastScroll: 0,
+    last: 0,
+    x: 0,
+    y: 0,
+    h: 0,
+    glow: 0,
+    init: false,
+    far: CAM_Z + 26,
+    farTarget: CAM_Z + 26,
+  });
   const fogTarget = useRef(new THREE.Color("#2244ff"));
   const haloTarget = useRef(new THREE.Color("#ffffff"));
   const [bg, setBg] = useState<BgSpec[]>([]);
@@ -181,12 +207,44 @@ function Scene() {
     const rnd = mulberry32(5);
     const base = new Float32Array(PN * 3);
     for (let i = 0; i < PN; i++) {
-      base[i * 3] = rnd() * 2 - 1; // x as a fraction of the visible half-width
-      base[i * 3 + 1] = rnd(); // y phase
-      base[i * 3 + 2] = rnd() * 18 - 16; // depth, -16 .. 2
+      base[i * 3] = rnd() * 2 - 1;
+      base[i * 3 + 1] = rnd();
+      base[i * 3 + 2] = rnd() * 18 - 16;
     }
     return { base, positions: new Float32Array(PN * 3) };
   }, []);
+
+  /** Put the main roll-on into the look of slot `idx` (colours, label, halo). */
+  const applyLook = (idx: number) => {
+    const sl = slots.current[idx];
+    if (!sl) return;
+    bodyMat.current?.color.set(sl.body);
+    ballMat.current?.color.set(sl.ball);
+    baseMat.current?.color.set(sl.base);
+    trimMat.current?.color.set(sl.trim);
+    const lm = labelMat.current;
+    if (lm) {
+      lm.map = textures.current[idx] ?? null;
+      lm.needsUpdate = true;
+    }
+    haloTarget.current.set(sl.accent).lerp(new THREE.Color("#ffffff"), 0.45);
+  };
+
+  /** Front-most background roll-on under a screen point, or -1. */
+  const hitTest = (cx: number, cy: number) => {
+    let best = -1;
+    let bestZ = -Infinity;
+    const arr = screen.current;
+    for (let i = 0; i < arr.length; i++) {
+      const sc = arr[i];
+      if (!sc) continue;
+      if (Math.hypot(cx - sc.sx, cy - sc.sy) < sc.rpx && sc.z > bestZ) {
+        best = i;
+        bestZ = sc.z;
+      }
+    }
+    return best;
+  };
 
   useEffect(() => {
     const els = Array.from(document.querySelectorAll<HTMLElement>("[data-bottle-slot]"));
@@ -202,21 +260,34 @@ function Scene() {
     }));
     textures.current = slots.current.map((s) => makeLabelTexture(s.label, s.accent));
 
-    // bottles floating at different depths behind the content
+    worlds.current = Array.from(document.querySelectorAll<HTMLElement>("[data-world]")).map((el) => ({
+      el,
+      color: new THREE.Color(el.dataset.world ?? "#2244ff"),
+      haze: parseFloat(el.dataset.haze ?? "1"),
+    }));
+
+    // roll-ons floating on three depth layers behind the content
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const list = slots.current;
     const pool = list.length > 1 ? list.slice(1) : list;
-    const n = reduce ? 0 : window.innerWidth < 700 ? 6 : 12;
+    const n = reduce ? 0 : window.innerWidth < 700 ? 9 : 12;
+    const perLayer = Math.max(1, Math.ceil(n / 3));
     const rnd = mulberry32(11);
     const specs: BgSpec[] = [];
     for (let i = 0; i < n; i++) {
-      const slot = pool[i % pool.length];
+      const layer = i % 3;
+      const k = Math.floor(i / 3);
+      const slot = pool[(i * 2 + layer) % pool.length];
       const tex = textures.current[list.indexOf(slot)];
+      const s0 = layer === 0 ? 1.5 + rnd() * 0.6 : layer === 1 ? 1.1 + rnd() * 0.5 : 0.9 + rnd() * 0.4;
+      const fxRaw = ((k + 0.5) / perLayer) * 2 - 1 + layer * 0.37 + (rnd() - 0.5) * 0.3;
       specs.push({
-        fx: rnd() * 2 - 1,
-        fy: rnd(),
-        z: -(3 + rnd() * 13),
-        s0: 0.9 + rnd() * 1.0,
+        fx: wrap(fxRaw, 2),
+        fy: (k / perLayer + layer * 0.31 + rnd() * 0.1) % 1,
+        z: LAYER_Z[layer],
+        s0,
+        r: s0 * 0.95,
+        layer,
         spin: (0.15 + rnd() * 0.45) * (rnd() < 0.5 ? -1 : 1),
         phase: rnd() * 6.28,
         tilt: (rnd() - 0.5) * 0.9,
@@ -224,17 +295,70 @@ function Scene() {
         map: tex,
       });
     }
+    phys.current = specs.map(() => ({ dx: 0, dy: 0, vx: 0, vy: 0, rot: 0, spinV: 0 }));
+    posX.current = specs.map(() => 0);
+    posY.current = specs.map(() => 0);
+    screen.current = [];
     setBg(specs);
 
     const onMove = (e: PointerEvent) => {
-      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+      const m = mouse.current;
+      m.x = (e.clientX / window.innerWidth) * 2 - 1;
+      m.y = (e.clientY / window.innerHeight) * 2 - 1;
+      m.cx = e.clientX;
+      m.cy = e.clientY;
+      m.type = e.pointerType;
+      m.t = performance.now();
+      m.overUI = !!(e.target as HTMLElement | null)?.closest(UI_SELECTOR);
+      const gr = grab.current;
+      if (gr && Math.hypot(e.clientX - gr.startX, e.clientY - gr.startY) > 6) gr.moved = true;
+    };
+    const onDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement | null)?.closest(UI_SELECTOR)) return;
+      const i = hitTest(e.clientX, e.clientY);
+      if (i < 0) return;
+      grab.current = { i, pointerType: e.pointerType, startX: e.clientX, startY: e.clientY, moved: false };
+      if (e.pointerType === "mouse") e.preventDefault();
+    };
+    const onUp = (e: PointerEvent) => {
+      const gr = grab.current;
+      grab.current = null;
+      if (!gr) return;
+      const ph = phys.current[gr.i];
+      const sc = screen.current[gr.i];
+      if (!ph || !sc) return;
+      if (gr.pointerType !== "mouse" || !gr.moved) {
+        // a tap or click: push the roll-on away from the finger or cursor, with a spin
+        let nx = sc.sx - e.clientX;
+        let ny = -(sc.sy - e.clientY);
+        const d = Math.hypot(nx, ny);
+        if (d < 1) {
+          nx = Math.random() - 0.5;
+          ny = 1;
+        } else {
+          nx /= d;
+          ny /= d;
+        }
+        ph.vx += nx * 9;
+        ph.vy += ny * 9 + 3;
+        ph.spinV += (nx >= 0 ? 1 : -1) * 7;
+      } else {
+        ph.spinV += (ph.vx >= 0 ? 1 : -1) * 4; // thrown: keep its momentum and add a spin
+      }
     };
     window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.cursor = "";
       textures.current.forEach((t) => t.dispose());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFrame((state) => {
@@ -243,19 +367,21 @@ function Scene() {
     driver.lastExternal = now;
     if (driver.lenis) driver.lenis.raf(now);
 
+    const s = st.current;
     const g = mainGroup.current;
     const list = slots.current;
     if (!g || list.length === 0) return;
 
+    const dt = s.last ? clamp((now - s.last) / 1000, 0.001, 0.05) : 0.016;
+    s.last = now;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const aspect = vw / vh;
     const upp = (2 * CAM_Z * TAN) / vh; // world units per screen pixel at the z = 0 plane
     const scrollY = window.scrollY;
     const t = now / 1000;
-    const s = st.current;
 
-    // 2. nearest slot to the middle of the screen
+    // 2. which fragrance slot is nearest the middle of the screen
     let best = 0;
     let bestDist = Infinity;
     let bestRect = list[0].el.getBoundingClientRect();
@@ -268,85 +394,197 @@ function Scene() {
         bestRect = r;
       }
     }
+    const active = bestDist < 0.6 * vh;
 
-    if (best !== s.index) {
-      s.index = best;
-      s.spin = Math.PI * 2; // one full turn that settles with the label facing front
-      const sl = list[best];
-      bodyMat.current?.color.set(sl.body);
-      ballMat.current?.color.set(sl.ball);
-      baseMat.current?.color.set(sl.base);
-      trimMat.current?.color.set(sl.trim);
-      const lm = labelMat.current;
-      if (lm) {
-        lm.map = textures.current[best] ?? null;
-        lm.needsUpdate = true;
+    // 3. main roll-on: it only transitions when the product changes
+    if (active && best !== s.index) {
+      if (s.index < 0) {
+        applyLook(best);
+      } else {
+        s.spin = Math.PI * 2; // one full turn while it glides across...
+        s.pending = best; // ...and swaps to the new fragrance part-way through
+        s.swapAt = now + 180;
       }
-      fogTarget.current.set(sl.accent).lerp(new THREE.Color(sl.deep), 0.5);
-      haloTarget.current.set(sl.accent).lerp(new THREE.Color("#ffffff"), 0.45);
+      s.index = best;
+    }
+    if (s.pending >= 0 && now >= s.swapAt) {
+      applyLook(s.pending);
+      s.pending = -1;
     }
 
-    // 3. the hero bottle: visible while its slot is near the middle, shrinks away as it leaves
-    const vis = 1 - smoothstep(0.3 * vh, 0.5 * vh, bestDist);
-    s.scale += (vis - s.scale) * 0.18;
-    s.spin *= 0.94;
-
     const slotH = bestRect.height * upp;
-    const unit = (slotH / 3.0) * s.scale;
-    const px = (bestRect.left + bestRect.width / 2 - vw / 2) * upp;
-    const py = -(bestRect.top + bestRect.height / 2 - vh / 2) * upp;
+    const parkX = TAN * CAM_Z * aspect + slotH * 0.9; // just off the right edge of the screen
+    const tx = active ? (bestRect.left + bestRect.width / 2 - vw / 2) * upp : parkX;
+    const cyPx = bestRect.top + bestRect.height / 2 - vh / 2;
+    const ty = active ? -clamp(cyPx, -0.1 * vh, 0.1 * vh) * upp : 0;
+    if (!s.init) {
+      s.x = tx;
+      s.y = ty;
+      s.h = slotH;
+      s.init = true;
+    }
+    s.x += (tx - s.x) * 0.1;
+    s.y += (ty - s.y) * 0.12;
+    s.h += (slotH - s.h) * 0.1;
+    s.glow += ((active ? 1 : 0) - s.glow) * 0.1;
 
     const vel = scrollY - s.lastScroll;
     s.lastScroll = scrollY;
-    s.tilt += (Math.max(-0.45, Math.min(0.45, vel * 0.006)) - s.tilt) * 0.1;
+    s.tilt += (clamp(vel * 0.006, -0.45, 0.45) - s.tilt) * 0.1;
+    s.spin *= 0.94;
 
-    g.visible = s.scale > 0.01;
-    g.position.set(px, py + Math.sin(t * 1.4) * 0.12, 0);
-    g.scale.setScalar(Math.max(unit, 0.0001));
+    g.visible = true;
+    g.position.set(s.x, s.y + Math.sin(t * 1.4) * 0.12, 0);
+    g.scale.setScalar(Math.max(s.h / 3.0, 0.0001));
     g.rotation.y = s.spin + Math.sin(t * 0.7) * 0.55 + Math.sin(scrollY * 0.003) * 0.35 + mouse.current.x * 0.4;
     g.rotation.x = mouse.current.y * 0.1 + s.tilt;
-    g.rotation.z = Math.sin(t * 0.8) * 0.03;
+    g.rotation.z = Math.sin(t * 0.8) * 0.03 - ((tx - s.x) / Math.max(slotH, 0.001)) * 0.4;
 
-    // 4. halo of light behind the bottle
     const h = halo.current;
     const hm = haloMat.current;
     if (h && hm) {
-      h.visible = s.scale > 0.01;
-      h.position.set(px, py, -2.5);
-      h.scale.setScalar(slotH * 1.7 * s.scale + 0.0001);
+      h.visible = s.glow > 0.01;
+      h.position.set(s.x, s.y, -2.5);
+      h.scale.setScalar(s.h * 1.7 + 0.0001);
       hm.color.lerp(haloTarget.current, 0.12);
-      hm.opacity = 0.6 * s.scale;
+      hm.opacity = 0.6 * s.glow;
     }
 
-    // 5. fog fades distant bottles into the current section's colour
+    // 4. atmosphere: distant roll-ons fade into the colour of the section behind them
+    const ws = worlds.current;
+    for (let i = 0; i < ws.length; i++) {
+      const r = ws[i].el.getBoundingClientRect();
+      if (r.top <= vh / 2 && r.bottom > vh / 2) {
+        fogTarget.current.copy(ws[i].color);
+        s.farTarget = CAM_Z + 8 + 18 * ws[i].haze;
+        break;
+      }
+    }
     const fog = state.scene.fog;
-    if (fog instanceof THREE.Fog) fog.color.lerp(fogTarget.current, 0.1);
+    if (fog instanceof THREE.Fog) {
+      fog.color.lerp(fogTarget.current, 0.08);
+      s.far += (s.farTarget - s.far) * 0.08;
+      fog.far = s.far;
+    }
 
-    // 6. the floating world is only shown while inside the fragrance sections
-    const bgS = 1 - smoothstep(0.55 * vh, 0.9 * vh, bestDist);
-    s.bg += (bgS - s.bg) * 0.1;
-    const bgGroupEl = bgGroup.current;
-    if (bgGroupEl) bgGroupEl.visible = s.bg > 0.02;
-
+    // 5. background roll-ons: scroll parallax + physics (cursor push, drag, throw, collisions)
     const specs = bg;
+    const ph = phys.current;
+    const mouseActive = mouse.current.type === "mouse" && now - mouse.current.t < 2500 && !mouse.current.overUI;
     for (let i = 0; i < specs.length; i++) {
-      const el = bgRefs.current[i];
       const b = specs[i];
-      if (!el) continue;
+      const p = ph[i];
+      if (!p) continue;
       const dist = CAM_Z - b.z;
       const halfH = TAN * dist;
       const halfW = halfH * aspect;
-      const range = halfH * 2 + 5;
+      const range = halfH * 2 + 8;
       const pxz = (2 * dist * TAN) / vh;
-      const f = 0.55 - -b.z * 0.028; // nearer bottles drift faster with scroll than far ones
-      const y = wrap((b.fy - 0.5) * range + scrollY * f * pxz + Math.sin(t * 0.6 + b.phase) * 0.3, range);
-      const x = b.fx * halfW * 0.95 + mouse.current.x * -b.z * 0.05;
-      el.position.set(x, y, b.z);
-      el.scale.setScalar(b.s0 * s.bg);
-      el.rotation.set(Math.sin(t * 0.4 + b.phase) * 0.25, t * b.spin + b.phase, b.tilt);
+      const f = 0.55 - -b.z * 0.028; // nearer layers drift faster with scroll than far ones
+      const homeX = b.fx * halfW * 0.95 + mouse.current.x * -b.z * 0.05;
+      const homeY = wrap((b.fy - 0.5) * range + scrollY * f * pxz, range) + Math.sin(t * 0.6 + b.phase) * 0.3;
+      const X = homeX + p.dx;
+      const Y = homeY + p.dy;
+      const pwx = mouse.current.x * halfW; // the pointer, at this layer's depth
+      const pwy = -mouse.current.y * halfH;
+
+      const gr = grab.current;
+      if (gr && gr.i === i && gr.pointerType === "mouse") {
+        p.vx = (pwx - X) * 14; // being dragged: follow the cursor
+        p.vy = (pwy - Y) * 14;
+      } else {
+        p.vx += -p.dx * 1.2 * dt; // gentle spring back to where it floats
+        p.vy += -p.dy * 1.2 * dt;
+        if (mouseActive) {
+          const ddx = X - pwx;
+          const ddy = Y - pwy;
+          const d = Math.hypot(ddx, ddy);
+          const R = b.r * 1.7;
+          if (d < R && d > 0.0001) {
+            const k = (1 - d / R) * 26 * dt; // cursor pushes nearby roll-ons away
+            p.vx += (ddx / d) * k;
+            p.vy += (ddy / d) * k;
+          }
+        }
+      }
+      const damp = Math.exp(-1.6 * dt);
+      p.vx *= damp;
+      p.vy *= damp;
+      p.dx = clamp(p.dx + p.vx * dt, -halfW * 1.3, halfW * 1.3);
+      p.dy = clamp(p.dy + p.vy * dt, -halfH * 1.3, halfH * 1.3);
+      p.rot += p.spinV * dt;
+      p.spinV *= Math.exp(-1.4 * dt);
+      posX.current[i] = homeX + p.dx;
+      posY.current[i] = homeY + p.dy;
     }
 
-    // 7. drifting particles
+    // roll-ons on the same layer bump into each other
+    for (let a = 0; a < specs.length; a++) {
+      for (let c = a + 1; c < specs.length; c++) {
+        if (specs[a].layer !== specs[c].layer) continue;
+        const pa = ph[a];
+        const pc = ph[c];
+        if (!pa || !pc) continue;
+        const ddx = posX.current[a] - posX.current[c];
+        const ddy = posY.current[a] - posY.current[c];
+        const d = Math.hypot(ddx, ddy);
+        const minD = specs[a].r + specs[c].r;
+        if (d < minD && d > 0.0001) {
+          const nx = ddx / d;
+          const ny = ddy / d;
+          const ov = (minD - d) / 2;
+          pa.dx += nx * ov;
+          pa.dy += ny * ov;
+          pc.dx -= nx * ov;
+          pc.dy -= ny * ov;
+          posX.current[a] += nx * ov;
+          posY.current[a] += ny * ov;
+          posX.current[c] -= nx * ov;
+          posY.current[c] -= ny * ov;
+          const rel = (pa.vx - pc.vx) * nx + (pa.vy - pc.vy) * ny;
+          if (rel < 0) {
+            const imp = -rel * 0.95;
+            pa.vx += nx * imp;
+            pa.vy += ny * imp;
+            pc.vx -= nx * imp;
+            pc.vy -= ny * imp;
+            pa.spinV += (Math.random() - 0.5) * 3;
+            pc.spinV += (Math.random() - 0.5) * 3;
+          }
+        }
+      }
+    }
+
+    // apply the positions to the 3D objects and remember where they are on screen (for clicking)
+    for (let i = 0; i < specs.length; i++) {
+      const b = specs[i];
+      const el = bgRefs.current[i];
+      const p = ph[i];
+      if (!el || !p) continue;
+      const dist = CAM_Z - b.z;
+      const halfH = TAN * dist;
+      const halfW = halfH * aspect;
+      el.position.set(posX.current[i], posY.current[i], b.z);
+      el.scale.setScalar(b.s0);
+      el.rotation.set(Math.sin(t * 0.4 + b.phase) * 0.25, t * b.spin + b.phase + p.rot, b.tilt);
+      screen.current[i] = {
+        sx: (posX.current[i] / halfW) * 0.5 * vw + vw * 0.5,
+        sy: vh * 0.5 - (posY.current[i] / halfH) * 0.5 * vh,
+        rpx: (b.r * vh) / (2 * halfH),
+        z: b.z,
+      };
+    }
+
+    // cursor feedback: open hand over a roll-on, closed hand while dragging
+    let want = "";
+    if (grab.current && grab.current.pointerType === "mouse") want = "grabbing";
+    else if (mouseActive && hitTest(mouse.current.cx, mouse.current.cy) >= 0) want = "grab";
+    if (want !== cursor.current) {
+      cursor.current = want;
+      document.body.style.cursor = want;
+    }
+
+    // 6. drifting particles
     const attr = posAttr.current;
     if (attr) {
       const arr = attr.array as Float32Array;
@@ -365,7 +603,6 @@ function Scene() {
       }
       attr.needsUpdate = true;
     }
-    if (ptsMat.current) ptsMat.current.opacity = 0.6 * s.bg;
   });
 
   return (
@@ -394,18 +631,17 @@ function Scene() {
           <bufferAttribute ref={posAttr} attach="attributes-position" args={[particles.positions, 3]} />
         </bufferGeometry>
         <pointsMaterial
-          ref={ptsMat}
           map={radialTex}
           size={0.28}
           sizeAttenuation
           transparent
-          opacity={0}
+          opacity={0.55}
           depthWrite={false}
           color="#ffffff"
         />
       </points>
 
-      <group ref={bgGroup}>
+      <group>
         {bg.map((b, i) => (
           <group
             key={i}
