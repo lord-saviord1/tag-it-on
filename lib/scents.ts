@@ -1,5 +1,6 @@
 export type Scent = {
   slug: string;
+  fx: string; // the shape that drifts through this fragrance's world
   index: string;
   name: string;
   tagline: string;
@@ -25,6 +26,7 @@ const facts = [
 export const scents: Scent[] = [
   {
     slug: "cool-breeze",
+    fx: "drop",
     index: "01",
     name: "Cool Breeze",
     tagline: "Aquatic, light, all-day",
@@ -40,6 +42,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "turbo",
+    fx: "bolt",
     index: "02",
     name: "Turbo",
     tagline: "Bold, dark, built for speed",
@@ -56,6 +59,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "whitening",
+    fx: "sparkle",
     index: "03",
     name: "Whitening",
     tagline: "Clean, fresh, whitening care",
@@ -71,6 +75,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "powerful-defense",
+    fx: "shield",
     index: "04",
     name: "Powerful Defense",
     tagline: "Strong protection, warm energy",
@@ -87,6 +92,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "fresh-mint",
+    fx: "leaf",
     index: "05",
     name: "Fresh Mint",
     tagline: "Cold mint, sharp finish",
@@ -102,6 +108,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "sensitive-skin",
+    fx: "bubble",
     index: "06",
     name: "Sensitive Skin",
     tagline: "Gentle on skin, calm scent",
@@ -118,6 +125,7 @@ export const scents: Scent[] = [
   },
   {
     slug: "romantic-charm",
+    fx: "petal",
     index: "07",
     name: "Romantic Charm",
     tagline: "Floral musk, evening wear",

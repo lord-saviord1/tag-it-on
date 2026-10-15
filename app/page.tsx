@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
-import Marquee from "@/components/Marquee";
+import DepthMarquee from "@/components/DepthMarquee";
 import ScentSection from "@/components/ScentSection";
 import Quiz from "@/components/Quiz";
 import { Story, RangeGrid, Proof, Cta, Footer } from "@/components/Sections";
@@ -22,7 +22,7 @@ export default function Home() {
       <SceneCanvas />
       <Header />
       <Hero />
-      <Marquee />
+      <DepthMarquee />
       <Story />
       <span id="fragrances" />
       {scents.map((s) => (

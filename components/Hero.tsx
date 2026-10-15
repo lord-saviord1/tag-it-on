@@ -10,7 +10,7 @@ const stats = [
 
 export default function Hero() {
   const base = scents.find((x) => x.slug === "whitening") ?? scents[0];
-  const colors = { ...base, accent: "#2a4bff", accentDeep: "#0f1f8f" };
+  const colors = { ...base, fx: "tag", accent: "#2a4bff", accentDeep: "#0f1f8f" };
   return (
     <section className="hero" data-world={mixHex("#2a4bff", "#0f1f8f")} data-haze="0.9">
       <div className="wrap hero-top">
