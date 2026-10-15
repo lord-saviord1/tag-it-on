@@ -1,4 +1,5 @@
 import BottleSlot from "./BottleSlot";
+import SketchRollOn from "./SketchRollOn";
 import { scents, mixHex } from "@/lib/scents";
 
 const stats = [
@@ -12,7 +13,8 @@ export default function Hero() {
   const base = scents.find((x) => x.slug === "whitening") ?? scents[0];
   const colors = { ...base, fx: "tag", accent: "#2a4bff", accentDeep: "#0f1f8f" };
   return (
-    <section className="hero" data-world={mixHex("#2a4bff", "#0f1f8f")} data-haze="0.9">
+    <section className="hero" data-world={mixHex("#2a4bff", "#0f1f8f")} data-haze="0.9" data-space="1">
+      <SketchRollOn />
       <div className="wrap hero-top">
         <div>
           <div className="hero-eyebrow reveal">ULTRA DRY ROLL-ON · BY IMPERIO INTERNATIONAL</div>

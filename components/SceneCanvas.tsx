@@ -5,18 +5,35 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { makeLabelTexture } from "@/lib/bottleLabel";
 import { driver } from "@/lib/lenisDriver";
+import { EVT } from "@/lib/events";
 
 const CAM_Z = 20;
 const FOV = 30;
 const TAN = Math.tan((FOV * Math.PI) / 360); // tan(fov / 2)
 const TWO_PI = Math.PI * 2;
 const LAYER_Z = [-4, -8.5, -14]; // near, middle and far layers of background roll-ons
-const UI_SELECTOR = "a, button, input, textarea, select, label, header, .quiz-overlay, [data-open-quiz]";
+const UI_SELECTOR =
+  "a, button, input, textarea, select, label, header, .quiz-overlay, .loader, [data-open-quiz], [data-no-bottle]";
 // a roll-on is approximated by three circles stacked on its long axis: [x, y, radius], model units
 const CIRCLES: [number, number, number][] = [
   [0, 0.8, 0.64],
   [0, 0.05, 0.52],
   [0, -0.75, 0.72],
+];
+
+// starfield streaks that fly out of the middle, far behind everything; they stretch when you scroll fast
+const STAR_N = 480;
+const STAR_Z = -26;
+const STAR_COLORS = ["#9fd4ff", "#ffffff", "#7dd3ff", "#9db8ff", "#c9a6ff", "#ff8fb8", "#ffc46b", "#6fe8c0"];
+const STAR_PICK = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7]; // weighted towards the blues
+// big soft glows far behind the stars: this is what makes the background read as deep space
+const NEB = [
+  { x: -12, y: 6, z: -34, size: 46, col: "#2244ff", ph: 0.3, op: 0.26 },
+  { x: 14, y: -5, z: -42, size: 60, col: "#7d3bff", ph: 1.2, op: 0.22 },
+  { x: 2, y: 9, z: -52, size: 70, col: "#00b7ff", ph: 2.1, op: 0.2 },
+  { x: -16, y: -10, z: -48, size: 56, col: "#ff4f9a", ph: 3.0, op: 0.13 },
+  { x: 18, y: 12, z: -58, size: 80, col: "#2a8be8", ph: 4.2, op: 0.22 },
+  { x: -4, y: -14, z: -62, size: 84, col: "#1fb583", ph: 5.1, op: 0.11 },
 ];
 
 const FX_TYPES = ["tag", "drop", "bolt", "sparkle", "shield", "leaf", "bubble", "petal"] as const;
@@ -36,7 +53,7 @@ const FX_PARAMS: Record<FxType, { fall: number; sway: number; amp: number; spin:
 
 type Colors = { body: string; ball: string; base: string; trim: string };
 type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string; fx: number };
-type World = { el: HTMLElement; color: THREE.Color; haze: number };
+type World = { el: HTMLElement; color: THREE.Color; haze: number; space: number };
 type BgSpec = {
   fx: number;
   fy: number;
@@ -128,6 +145,30 @@ function makeRadialTexture() {
   g.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** A streak: transparent tail, bright head, soft edges. Used for the starfield. */
+function makeStreakTexture() {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 32;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 256, 0);
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(0.3, "rgba(255,255,255,0.9)");
+  g.addColorStop(1, "rgba(255,255,255,1)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 32);
+  ctx.globalCompositeOperation = "destination-in";
+  const v = ctx.createLinearGradient(0, 0, 0, 32);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(0.5, "rgba(0,0,0,1)");
+  v.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, 256, 32);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -299,6 +340,23 @@ function Scene() {
     []
   );
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const streakTex = useMemo(() => makeStreakTexture(), []);
+  const starData = useMemo(() => {
+    const rnd = mulberry32(777);
+    return Array.from({ length: STAR_N }, () => ({
+      a: rnd() * TWO_PI,
+      offset: rnd(),
+      len: 1.5 + rnd() * 7.5,
+      w: 0.05 + rnd() * 0.06,
+      c: STAR_PICK[Math.floor(rnd() * STAR_PICK.length)],
+    }));
+  }, []);
+  const starMesh = useRef<THREE.InstancedMesh>(null);
+  const starMat = useRef<THREE.MeshBasicMaterial>(null);
+  const starCount = useRef(STAR_N);
+  const nebMeshes = useRef<(THREE.Mesh | null)[]>([]);
+  const nebMats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+  const tmpColor = useRef(new THREE.Color());
 
   const mainGroup = useRef<THREE.Group>(null);
   const halo = useRef<THREE.Mesh>(null);
@@ -345,6 +403,12 @@ function Scene() {
     glow: 0,
     init: false,
     fxActive: 0,
+    ready: false,
+    warp: 0,
+    burst: 0,
+    starPhase: 0,
+    space: 0,
+    spaceTarget: 0,
     far: CAM_Z + 26,
     farTarget: CAM_Z + 26,
   });
@@ -405,10 +469,22 @@ function Scene() {
       el,
       color: new THREE.Color(el.dataset.world ?? "#2244ff"),
       haze: parseFloat(el.dataset.haze ?? "1"),
+      space: parseFloat(el.dataset.space ?? "0"),
     }));
 
     const small = window.innerWidth < 700;
-    fxCount.current = small ? 24 : FX_COUNT;
+    fxCount.current = small ? 16 : FX_COUNT;
+    starCount.current = small ? 260 : STAR_N;
+    const sm = starMesh.current;
+    if (sm) {
+      sm.count = starCount.current;
+      const col = new THREE.Color();
+      for (let i = 0; i < STAR_N; i++) {
+        col.set(STAR_COLORS[starData[i].c]);
+        sm.setColorAt(i, col);
+      }
+      if (sm.instanceColor) sm.instanceColor.needsUpdate = true;
+    }
     fxMeshes.current.forEach((m) => {
       if (m) m.count = fxCount.current;
     });
@@ -417,8 +493,8 @@ function Scene() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const list = slots.current;
     const pool = list.length > 1 ? list.slice(1) : list;
-    const nHang = reduce ? 0 : small ? 7 : 8;
-    const nDrift = reduce ? 0 : small ? 2 : 3;
+    const nHang = reduce ? 0 : small ? 5 : 8;
+    const nDrift = reduce ? 0 : small ? 1 : 3;
     const perLayer = Math.max(1, Math.ceil(nHang / 3));
     const rnd = mulberry32(11);
     const specs: BgSpec[] = [];
@@ -426,7 +502,7 @@ function Scene() {
       const slot = pool[(i * 2 + layer) % pool.length];
       const tex = textures.current[list.indexOf(slot)];
       // background roll-ons are 10% smaller than before
-      const s0 = (layer === 0 ? 1.5 + rnd() * 0.6 : layer === 1 ? 1.1 + rnd() * 0.5 : 0.9 + rnd() * 0.4) * 0.9;
+      const s0 = (layer === 0 ? 1.5 + rnd() * 0.6 : layer === 1 ? 1.1 + rnd() * 0.5 : 0.9 + rnd() * 0.4) * (small ? 0.72 : 0.9);
       const fxRaw = ((k + 0.5) / perLayer) * 2 - 1 + layer * 0.37 + (rnd() - 0.5) * 0.3;
       specs.push({
         fx: wrap(fxRaw, 2),
@@ -502,11 +578,16 @@ function Scene() {
         ph.spinV += (ph.vx >= 0 ? 1 : -1) * 4; // thrown: keep its momentum and add a spin
       }
     };
+    const onBurst = () => {
+      st.current.burst = Math.max(st.current.burst, 1.6);
+    };
+    window.addEventListener(EVT.burst, onBurst);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     return () => {
+      window.removeEventListener(EVT.burst, onBurst);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointerup", onUp);
@@ -595,6 +676,7 @@ function Scene() {
         } else if (best !== s.index) {
           // leaving: slide out of the side it is on, spinning faster and faster
           s.mode = "out";
+          s.burst = Math.max(s.burst, 0.9); // warp the stars while the roll-on changes
           s.pending = best;
           s.outDir = s.x >= 0 ? 1 : -1;
           s.omega = 4;
@@ -663,6 +745,7 @@ function Scene() {
       if (r.top <= vh / 2 && r.bottom > vh / 2) {
         fogTarget.current.copy(ws[i].color);
         s.farTarget = CAM_Z + 8 + 18 * ws[i].haze;
+        s.spaceTarget = ws[i].space;
         break;
       }
     }
@@ -697,6 +780,22 @@ function Scene() {
       const homeY = wrap((b.fy - 0.5) * range + scrollY * f * pxz, range) + Math.sin(t * 0.6 + b.phase) * 0.3;
       const X = homeX + p.dx;
       const Y = homeY + p.dy;
+
+      // personal space: nothing else drifts into the main roll-on's area (strict on phones)
+      if (s.glow > 0.2) {
+        const kk = dist / CAM_Z;
+        const ex = X - s.x * kk;
+        const ey = Y - s.y * kk;
+        const ed = Math.hypot(ex, ey);
+        const R = (s.h * 0.62 * kk + b.r * 0.9) * (vw < 700 ? 1 : 0.55);
+        if (ed < R && ed > 0.0001) {
+          const pen = R - ed;
+          p.vx += (ex / ed) * pen * 9 * dt;
+          p.vy += (ey / ed) * pen * 9 * dt;
+          p.dx += (ex / ed) * pen * 0.12;
+          p.dy += (ey / ed) * pen * 0.12;
+        }
+      }
       const pwx = mouse.current.x * halfW; // the pointer, at this layer's depth
       const pwy = -mouse.current.y * halfH;
 
@@ -887,6 +986,68 @@ function Scene() {
       }
       mesh.instanceMatrix.needsUpdate = true;
     }
+
+    // 7. deep space: glow clouds far behind, and a starfield that streaks when you scroll or move between sections
+    s.space += (s.spaceTarget - s.space) * ease(3);
+    const warpTarget = clamp(Math.abs(vel / dt) / 3000, 0, 1.2);
+    s.warp += (warpTarget + s.burst - s.warp) * ease(4);
+    s.burst *= Math.exp(-1.4 * dt);
+    s.starPhase += (0.025 + Math.min(s.warp, 1.8) * 0.9) * dt;
+
+    const sm = starMesh.current;
+    if (sm) {
+      sm.visible = s.space > 0.02;
+      if (sm.visible) {
+        const distS = CAM_Z - STAR_Z;
+        const halfHS = TAN * distS;
+        const halfWS = halfHS * aspect;
+        const maxD = Math.hypot(halfWS, halfHS) * 1.2;
+        const hole = 1.3;
+        const w = Math.min(s.warp, 1.6);
+        const n = starCount.current;
+        for (let i = 0; i < n; i++) {
+          const sd = starData[i];
+          const travel = (((s.starPhase * 4 - sd.offset) % 1) + 1) % 1;
+          const head = hole + travel * (maxD - hole);
+          const len = sd.len * (0.12 + w) * (0.3 + travel * 0.9);
+          const tail = Math.max(hole, head - len);
+          const cd = (head + tail) / 2;
+          const ramp = clamp((head - hole) / 4, 0, 1);
+          dummy.position.set(Math.cos(sd.a) * cd, Math.sin(sd.a) * cd, STAR_Z);
+          dummy.rotation.set(0, 0, sd.a);
+          dummy.scale.set(Math.max(head - tail, 0.001), sd.w * (0.5 + travel * 0.9) * ramp, 1);
+          dummy.updateMatrix();
+          sm.setMatrixAt(i, dummy.matrix);
+        }
+        sm.instanceMatrix.needsUpdate = true;
+        if (starMat.current) starMat.current.opacity = 0.95 * s.space;
+      }
+    }
+
+    for (let i = 0; i < NEB.length; i++) {
+      const m = nebMeshes.current[i];
+      const mt = nebMats.current[i];
+      if (!m || !mt) continue;
+      const nb = NEB[i];
+      m.visible = s.space > 0.02;
+      if (!m.visible) continue;
+      m.position.set(
+        nb.x + Math.sin(t * 0.05 + nb.ph) * 2 + mouse.current.x * -nb.z * 0.03,
+        nb.y + Math.sin(scrollY * 0.0007 + nb.ph) * 5 + Math.cos(t * 0.04 + nb.ph) * 1.5,
+        nb.z
+      );
+      m.rotation.z = t * 0.01 * (nb.ph > 3 ? -1 : 1);
+      // each glow keeps its own hue but leans towards the colour of the section you are in
+      tmpColor.current.set(nb.col).lerp(fogTarget.current, 0.35);
+      mt.color.lerp(tmpColor.current, 0.05);
+      mt.opacity = nb.op * s.space;
+    }
+
+    if (!s.ready) {
+      s.ready = true;
+      window.__tagSceneReady = true;
+      window.dispatchEvent(new Event(EVT.sceneReady));
+    }
   });
 
   return (
@@ -895,6 +1056,44 @@ function Scene() {
       <hemisphereLight args={["#ffffff", "#8896c8", 0.6]} />
       <directionalLight position={[2, 3, 5]} intensity={2.2} />
       <directionalLight position={[-3, 1, -2]} intensity={1.0} color="#9bb4ff" />
+
+      {NEB.map((n, i) => (
+        <mesh
+          key={i}
+          ref={(m) => {
+            nebMeshes.current[i] = m;
+          }}
+          position={[n.x, n.y, n.z]}
+          scale={[n.size, n.size, 1]}
+        >
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            ref={(m) => {
+              nebMats.current[i] = m;
+            }}
+            map={radialTex}
+            color={n.col}
+            transparent
+            opacity={0}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            fog={false}
+          />
+        </mesh>
+      ))}
+
+      <instancedMesh ref={starMesh} args={[undefined, undefined, STAR_N]} frustumCulled={false}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial
+          ref={starMat}
+          map={streakTex}
+          transparent
+          opacity={0}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          fog={false}
+        />
+      </instancedMesh>
 
       <mesh ref={halo} position={[0, 0, -2.5]}>
         <planeGeometry args={[1, 1]} />

@@ -13,6 +13,7 @@ export type Scent = {
   // section background gradient
   accent: string;
   accentDeep: string;
+  glow: string; // bright colour that glows in the corner of the section
   facts: { num: string; label: string }[];
   flip?: boolean;
 };
@@ -38,6 +39,7 @@ export const scents: Scent[] = [
     trim: "#bcd7f5",
     accent: "#2a8be8",
     accentDeep: "#0d4fa8",
+    glow: "#5fd0ff",
     facts,
   },
   {
@@ -52,8 +54,9 @@ export const scents: Scent[] = [
     ball: "#4a4c52",
     base: "#c9ccd1",
     trim: "#d0262d",
-    accent: "#3a3d44",
-    accentDeep: "#111214",
+    accent: "#262932",
+    accentDeep: "#07080b",
+    glow: "#ff3b30",
     facts,
     flip: true,
   },
@@ -71,6 +74,7 @@ export const scents: Scent[] = [
     trim: "#f2a5bd",
     accent: "#d81b57",
     accentDeep: "#7d0a2c",
+    glow: "#ff9ab8",
     facts,
   },
   {
@@ -87,6 +91,7 @@ export const scents: Scent[] = [
     trim: "#ffd27a",
     accent: "#ff9a2e",
     accentDeep: "#d4540f",
+    glow: "#ffd24d",
     facts,
     flip: true,
   },
@@ -104,6 +109,7 @@ export const scents: Scent[] = [
     trim: "#8fd6b8",
     accent: "#1fb583",
     accentDeep: "#0a6a49",
+    glow: "#7dffd0",
     facts,
   },
   {
@@ -120,6 +126,7 @@ export const scents: Scent[] = [
     trim: "#e6e7ec",
     accent: "#8f4fb5",
     accentDeep: "#4a1a66",
+    glow: "#d9a6ff",
     facts,
     flip: true,
   },
@@ -137,6 +144,7 @@ export const scents: Scent[] = [
     trim: "#f4b6c8",
     accent: "#ff7aa6",
     accentDeep: "#b02a5b",
+    glow: "#ffc2d9",
     facts,
   },
 ];
