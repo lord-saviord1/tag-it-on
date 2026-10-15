@@ -3,7 +3,7 @@ import BottleSlot from "./BottleSlot";
 import { mixHex, type Scent } from "@/lib/scents";
 
 export default function ScentSection({ scent }: { scent: Scent }) {
-  const vars = { "--c1": scent.accent, "--c2": scent.accentDeep } as CSSProperties;
+  const vars = { "--c1": scent.accent, "--c2": scent.accentDeep, "--g": scent.glow } as CSSProperties;
   return (
     <section
       className={`scent ${scent.flip ? "flip" : ""}`}
@@ -11,6 +11,7 @@ export default function ScentSection({ scent }: { scent: Scent }) {
       style={vars}
       data-world={mixHex(scent.accent, scent.accentDeep)}
       data-haze="1"
+      data-space="0.6"
     >
       <div className="bg-word" aria-hidden="true">
         {scent.name}

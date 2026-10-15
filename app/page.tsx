@@ -6,6 +6,7 @@ import Hero from "@/components/Hero";
 import DepthMarquee from "@/components/DepthMarquee";
 import ScentSection from "@/components/ScentSection";
 import Quiz from "@/components/Quiz";
+import Loader from "@/components/Loader";
 import { Story, RangeGrid, Proof, Cta, Footer } from "@/components/Sections";
 import { useReveal } from "@/components/useReveal";
 import { scents } from "@/lib/scents";
@@ -33,6 +34,7 @@ export default function Home() {
       <Cta />
       <Footer />
       <Quiz />
+      <Loader />
     </>
   );
 }
