@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import * as THREE from "three";
 import { makeLabelTexture } from "@/lib/bottleLabel";
 import { EVT } from "@/lib/events";
@@ -27,6 +28,8 @@ const STAR_COLORS = ["#cbbcff", "#ffffff", "#9db8ff", "#b58cff", "#7dd3ff", "#ff
 const STAR_PICK = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7]; // weighted towards the blues
 // big soft glows far behind the stars: this is what makes the background read as deep space
 const NEB: { x: number; y: number; z: number; size: number; col: string; ph: number; op: number }[] = []; // glows now live in the page background (cheaper)
+
+const WHITE = new THREE.Color("#ffffff");
 
 const FX_TYPES = ["tag", "drop", "bolt", "sparkle", "shield", "leaf", "bubble", "petal"] as const;
 type FxType = (typeof FX_TYPES)[number];
@@ -66,11 +69,11 @@ type ScreenInfo = { sx: number; sy: number; hw: number; hh: number; z: number };
 type Grab = { i: number; pointerType: string; startX: number; startY: number; moved: boolean };
 type Geos = { shell: THREE.LatheGeometry; bowl: THREE.LatheGeometry; seg: number };
 type MatRefs = {
-  body: RefObject<THREE.MeshStandardMaterial>;
-  ball: RefObject<THREE.MeshStandardMaterial>;
-  base: RefObject<THREE.MeshStandardMaterial>;
-  trim: RefObject<THREE.MeshStandardMaterial>;
-  label: RefObject<THREE.MeshStandardMaterial>;
+  body: RefObject<THREE.MeshPhysicalMaterial>;
+  ball: RefObject<THREE.MeshPhysicalMaterial>;
+  base: RefObject<THREE.MeshPhysicalMaterial>;
+  trim: RefObject<THREE.MeshPhysicalMaterial>;
+  label: RefObject<THREE.MeshPhysicalMaterial>;
 };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -272,33 +275,36 @@ function BottleParts({
   colors,
   map,
   refs,
+  fancy = false,
 }: {
   geo: Geos;
   colors?: Colors;
   map?: THREE.Texture | null;
   refs?: MatRefs;
+  fancy?: boolean; // the main roll-on gets a glossy clear coat; the far ones stay cheap
 }) {
+  const cc = fancy ? 1 : 0;
   const c = colors ?? { body: "#ffffff", ball: "#ffffff", base: "#ffffff", trim: "#ffffff" };
   const s = geo.seg;
   return (
     <group position={[0, -0.1, 0]}>
       <mesh geometry={geo.shell}>
-        <meshStandardMaterial ref={refs?.body} color={c.body} roughness={0.28} metalness={0.12} side={THREE.DoubleSide} />
+        <meshPhysicalMaterial ref={refs?.body} color={c.body} roughness={0.3} metalness={0.1} clearcoat={cc} clearcoatRoughness={0.12} envMapIntensity={0.65} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.52, 0.04, 10, s]} />
-        <meshStandardMaterial ref={refs?.trim} color={c.trim} roughness={0.3} metalness={0.2} />
+        <meshPhysicalMaterial ref={refs?.trim} color={c.trim} roughness={0.3} metalness={0.2} clearcoat={cc} envMapIntensity={0.65} />
       </mesh>
       <mesh position={[0, -0.5, 0]}>
         <sphereGeometry args={[0.66, s, Math.round(s * 0.75)]} />
-        <meshStandardMaterial ref={refs?.ball} color={c.ball} roughness={0.25} metalness={0.12} />
+        <meshPhysicalMaterial ref={refs?.ball} color={c.ball} roughness={0.25} metalness={0.1} clearcoat={cc} clearcoatRoughness={0.1} envMapIntensity={0.7} />
       </mesh>
       <mesh geometry={geo.bowl}>
-        <meshStandardMaterial ref={refs?.base} color={c.base} roughness={0.3} metalness={0.05} side={THREE.DoubleSide} />
+        <meshPhysicalMaterial ref={refs?.base} color={c.base} roughness={0.3} metalness={0.05} clearcoat={cc} envMapIntensity={0.65} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.78, 0]}>
         <cylinderGeometry args={[0.615, 0.585, 0.95, s, 1, true, -0.95, 1.9]} />
-        <meshStandardMaterial ref={refs?.label} map={map ?? null} transparent roughness={0.4} metalness={0} side={THREE.DoubleSide} />
+        <meshPhysicalMaterial ref={refs?.label} map={map ?? null} transparent roughness={0.4} metalness={0} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -360,11 +366,11 @@ function Scene() {
   const fxTint = useRef(new THREE.Color("#ffffff"));
   const fxCount = useRef(FX_COUNT);
 
-  const bodyMat = useRef<THREE.MeshStandardMaterial>(null);
-  const ballMat = useRef<THREE.MeshStandardMaterial>(null);
-  const baseMat = useRef<THREE.MeshStandardMaterial>(null);
-  const trimMat = useRef<THREE.MeshStandardMaterial>(null);
-  const labelMat = useRef<THREE.MeshStandardMaterial>(null);
+  const bodyMat = useRef<THREE.MeshPhysicalMaterial>(null);
+  const ballMat = useRef<THREE.MeshPhysicalMaterial>(null);
+  const baseMat = useRef<THREE.MeshPhysicalMaterial>(null);
+  const trimMat = useRef<THREE.MeshPhysicalMaterial>(null);
+  const labelMat = useRef<THREE.MeshPhysicalMaterial>(null);
   const refs: MatRefs = { body: bodyMat, ball: ballMat, base: baseMat, trim: trimMat, label: labelMat };
 
   const slots = useRef<Slot[]>([]);
@@ -397,6 +403,8 @@ function Scene() {
     fxActive: 0,
     ready: false,
     ema: 16,
+    fpsFrames: 0,
+    fpsT: 0,
     slow: 0,
     lowQ: false,
     starX: 0,
@@ -410,9 +418,51 @@ function Scene() {
     far: CAM_Z + 26,
     farTarget: CAM_Z + 26,
   });
+  const rectRef = useRef({ top: 0, left: 0, width: 0, height: 0 });
+  const perfEl = useRef<HTMLDivElement | null>(null);
   const fogTarget = useRef(new THREE.Color("#2244ff"));
   const haloTarget = useRef(new THREE.Color("#ffffff"));
   const [bg, setBg] = useState<BgSpec[]>([]);
+
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    // a small built-in studio gives the glossy plastic real reflections (no download needed)
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    return () => {
+      scene.environment = null;
+      env.dispose();
+      pmrem.dispose();
+    };
+  }, [gl, scene]);
+
+  useEffect(
+    () => () => {
+      hiGeo.shell.dispose();
+      hiGeo.bowl.dispose();
+      loGeo.shell.dispose();
+      loGeo.bowl.dispose();
+      radialTex.dispose();
+      streakTex.dispose();
+      fxTex.forEach((t) => t.dispose());
+    },
+    [hiGeo, loGeo, radialTex, streakTex, fxTex]
+  );
+
+  useEffect(() => {
+    // open the site with ?perf on the end of the address to see live FPS and draw calls
+    if (!new URLSearchParams(window.location.search).has("perf")) return;
+    const el = document.createElement("div");
+    el.style.cssText =
+      "position:fixed;left:8px;top:8px;z-index:9999;font:12px/1.4 monospace;background:rgba(0,0,0,.72);color:#7dffb0;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre";
+    document.body.appendChild(el);
+    perfEl.current = el;
+    return () => {
+      el.remove();
+      perfEl.current = null;
+    };
+  }, []);
 
   /** Put the main roll-on into the look of slot `idx` (colours, label, halo). */
   const applyLook = (idx: number) => {
@@ -427,7 +477,7 @@ function Scene() {
       lm.map = textures.current[idx] ?? null;
       lm.needsUpdate = true;
     }
-    haloTarget.current.set(sl.accent).lerp(new THREE.Color("#ffffff"), 0.45);
+    haloTarget.current.set(sl.accent).lerp(WHITE, 0.45);
   };
 
   /** Front-most background roll-on under a screen point, or -1. */
@@ -646,8 +696,24 @@ function Scene() {
     const list = slots.current;
     if (!g || list.length === 0) return;
 
-    const dt = s.last ? clamp((now - s.last) / 1000, 0.001, 0.05) : 0.016;
+    const rawDt = s.last ? (now - s.last) / 1000 : 0.016;
+    const dt = clamp(rawDt, 0.001, 0.05);
     s.last = now;
+    s.fpsFrames++;
+    s.fpsT += rawDt;
+    if (s.fpsT >= 0.5) {
+      const el = perfEl.current;
+      if (el) {
+        const info = state.gl.info;
+        el.textContent =
+          `${Math.round(s.fpsFrames / s.fpsT)} fps  ${((s.fpsT / s.fpsFrames) * 1000).toFixed(1)} ms\n` +
+          `draw calls ${info.render.calls}  triangles ${info.render.triangles}\n` +
+          `geometries ${info.memory.geometries}  textures ${info.memory.textures}\n` +
+          `quality ${s.lowQ ? "reduced" : "full"}`;
+      }
+      s.fpsFrames = 0;
+      s.fpsT = 0;
+    }
     s.ema += (dt * 1000 - s.ema) * 0.05;
     if (!s.lowQ) {
       s.slow = s.ema > 26 ? s.slow + dt : Math.max(0, s.slow - dt);
@@ -668,7 +734,11 @@ function Scene() {
     // 2. which fragrance slot is nearest the middle of the screen
     let best = 0;
     let bestDist = Infinity;
-    let bestRect = { top: list[0].top - scrollY, left: list[0].left, width: list[0].w, height: list[0].h };
+    const bestRect = rectRef.current;
+    bestRect.top = list[0].top - scrollY;
+    bestRect.left = list[0].left;
+    bestRect.width = list[0].w;
+    bestRect.height = list[0].h;
     for (let i = 0; i < list.length; i++) {
       const sl = list[i];
       const top = sl.top - scrollY;
@@ -676,7 +746,10 @@ function Scene() {
       if (d < bestDist) {
         bestDist = d;
         best = i;
-        bestRect = { top, left: sl.left, width: sl.w, height: sl.h };
+        bestRect.top = top;
+        bestRect.left = sl.left;
+        bestRect.width = sl.w;
+        bestRect.height = sl.h;
       }
     }
     const active = bestDist < 0.6 * vh;
@@ -901,11 +974,15 @@ function Scene() {
         let ny = 0;
         let cxp = 0;
         let cyp = 0;
-        for (const [, ly1, r1] of CIRCLES) {
+        for (let ia = 0; ia < CIRCLES.length; ia++) {
+          const ly1 = CIRCLES[ia][1];
+          const r1 = CIRCLES[ia][2];
           const ax = px[a] - ly1 * sinA * A.s0;
           const ay = py[a] + ly1 * cosA * A.s0;
           const ar = r1 * A.s0;
-          for (const [, ly2, r2] of CIRCLES) {
+          for (let ib = 0; ib < CIRCLES.length; ib++) {
+            const ly2 = CIRCLES[ib][1];
+            const r2 = CIRCLES[ib][2];
             const qx = px[c] - ly2 * sinC * C.s0;
             const qy = py[c] + ly2 * cosC * C.s0;
             const qr = r2 * C.s0;
@@ -995,7 +1072,7 @@ function Scene() {
       const sl = list[best];
       if (sl && active) {
         s.fxActive = sl.fx;
-        fxTint.current.set(sl.accent).lerp(new THREE.Color("#ffffff"), 0.6);
+        fxTint.current.set(sl.accent).lerp(WHITE, 0.6);
       }
     }
     for (let k = 0; k < FX_TYPES.length; k++) {
@@ -1104,10 +1181,10 @@ function Scene() {
 
   return (
     <>
-      <ambientLight intensity={0.8} />
-      <hemisphereLight args={["#ffffff", "#8896c8", 0.6]} />
-      <directionalLight position={[2, 3, 5]} intensity={2.2} />
-      <directionalLight position={[-3, 1, -2]} intensity={1.0} color="#9bb4ff" />
+      <ambientLight intensity={0.45} />
+      <hemisphereLight args={["#ffffff", "#8896c8", 0.35]} />
+      <directionalLight position={[2, 3, 5]} intensity={1.7} />
+      <directionalLight position={[-3, 1, -2]} intensity={0.8} color="#9bb4ff" />
 
       {NEB.map((n, i) => (
         <mesh
@@ -1198,15 +1275,61 @@ function Scene() {
       </group>
 
       <group ref={mainGroup}>
-        <BottleParts geo={hiGeo} refs={refs} />
+        <BottleParts geo={hiGeo} refs={refs} fancy />
       </group>
     </>
   );
 }
 
 export default function SceneCanvas() {
+  // sections without a roll-on cover the scene with solid backgrounds, so stop drawing it there
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-space]")).filter(
+      (el) => parseFloat(el.dataset.space ?? "0") > 0.05
+    );
+    let boxes: { top: number; bottom: number }[] = [];
+    const check = () => {
+      const sy = window.scrollY;
+      const vh = window.innerHeight;
+      const vis = boxes.length === 0 || boxes.some((b) => b.bottom > sy - 0.5 * vh && b.top < sy + 1.5 * vh);
+      setShow((prev) => (prev === vis ? prev : vis));
+    };
+    const measure = () => {
+      const sy = window.scrollY;
+      boxes = els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top + sy, bottom: r.bottom + sy };
+      });
+      check();
+    };
+    measure();
+    let timer = 0;
+    const later = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(measure, 150);
+    };
+    const ro = new ResizeObserver(later);
+    ro.observe(document.body);
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", later);
+    window.addEventListener("load", later);
+    window.addEventListener(EVT.entered, later);
+    const t1 = window.setTimeout(measure, 900);
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(timer);
+      window.clearTimeout(t1);
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", later);
+      window.removeEventListener("load", later);
+      window.removeEventListener(EVT.entered, later);
+    };
+  }, []);
+
   return (
     <Canvas
+      frameloop={show ? "always" : "never"}
       flat
       dpr={[1, 1.25]}
       camera={{ fov: FOV, position: [0, 0, CAM_Z], near: 0.1, far: 200 }}

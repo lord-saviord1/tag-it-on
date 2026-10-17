@@ -110,7 +110,7 @@ export function Cta() {
 export function Footer() {
   const socials = Object.entries(links.social).filter(([, url]) => url);
   return (
-    <footer data-world="#04030f" data-haze="0.3" data-space="1">
+    <footer data-world="#04030f" data-haze="0.3" data-space="0">
       <div className="wrap">
         <AsciiFooter />
         <div className="foot-top">
