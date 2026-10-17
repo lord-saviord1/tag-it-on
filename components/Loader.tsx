@@ -8,7 +8,7 @@ type Phase = "loading" | "ready" | "exploding" | "panel" | "closing" | "done";
 
 const TWO_PI = Math.PI * 2;
 // colours of the roll-on drawn by the loader: body, label, ball, base, collar
-const PALETTE = ["#2a4bff", "#ffffff", "#3b82ff", "#dfe9ff", "#7dd3ff"];
+const PALETTE = ["#6d3bff", "#ffffff", "#9a7bff", "#e9e2ff", "#4dd2ff"];
 // right-hand outline of the roll-on, [radius, height], top to bottom (the same shape as the 3D model)
 const PROFILE: [number, number][] = [
   [0, 1.56],

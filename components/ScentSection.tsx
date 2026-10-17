@@ -9,7 +9,7 @@ export default function ScentSection({ scent }: { scent: Scent }) {
       className={`scent ${scent.flip ? "flip" : ""}`}
       id={`scent-${scent.slug}`}
       style={vars}
-      data-world={mixHex(scent.accent, scent.accentDeep)}
+      data-world={mixHex("#0d0830", scent.glow, 0.18)}
       data-haze="1"
       data-space="0.6"
     >

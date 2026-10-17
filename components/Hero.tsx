@@ -1,6 +1,6 @@
 import BottleSlot from "./BottleSlot";
 import SketchRollOn from "./SketchRollOn";
-import { scents, mixHex } from "@/lib/scents";
+import { scents } from "@/lib/scents";
 
 const stats = [
   { num: "48HRS", lbl: "of protection, up to, in every fragrance" },
@@ -11,9 +11,9 @@ const stats = [
 
 export default function Hero() {
   const base = scents.find((x) => x.slug === "whitening") ?? scents[0];
-  const colors = { ...base, fx: "tag", accent: "#2a4bff", accentDeep: "#0f1f8f" };
+  const colors = { ...base, fx: "tag", accent: "#6d3bff", accentDeep: "#2a1a7a" };
   return (
-    <section className="hero" data-world={mixHex("#2a4bff", "#0f1f8f")} data-haze="0.9" data-space="1">
+    <section className="hero" data-world="#160c4a" data-haze="0.9" data-space="1">
       <SketchRollOn />
       <div className="wrap hero-top">
         <div>

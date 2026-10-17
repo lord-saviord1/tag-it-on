@@ -92,8 +92,8 @@ export default function AsciiFooter() {
       lit.forEach((key) => {
         const [col, row] = key.split(",").map(Number);
         const t = rows > 1 ? row / (rows - 1) : 0;
-        const rr = Math.round(207 + (59 - 207) * t);
-        const gg = Math.round(230 + (130 - 230) * t);
+        const rr = Math.round(226 + (122 - 226) * t);
+        const gg = Math.round(214 + (77 - 214) * t);
         cells.push({
           col,
           row,

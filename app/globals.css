@@ -592,3 +592,102 @@ html:not(.is-loading) .sketch path{ stroke-dashoffset:0; }
 @media (max-width: 860px){
   .sketch{ left:auto; right:-16vw; bottom:-4vh; height:54vh; opacity:0.5; }
 }
+
+/* ================= v7: one calm space palette, fewer things at once ================= */
+:root{
+  --space-0:#04030f; --space-1:#07041a; --space-2:#0f0a33; --space-3:#1a0f4d; --space-4:#2a1a7a;
+  --violet:#7a4dff; --iris:#6d3bff; --magenta:#c24dff; --cyan:#4dd2ff; --lilac:#cbbcff;
+}
+body{ background:var(--space-1); color:#f4f1ff; }
+body::after{ display:none; } /* the film grain is gone: one less full-screen layer to draw */
+
+/* header */
+header{ background:rgba(8,5,28,0.92); backdrop-filter:none; border-bottom:1px solid rgba(160,140,255,0.18); }
+.logo, header .nav-links a{ color:#fff; }
+header .nav-links a{ opacity:0.85; }
+.nav-cta{ background:linear-gradient(135deg, #6d3bff, #2a8bff); color:#fff; }
+.menu-btn span{ background:#fff; }
+.mobile-menu{ background:#0a0624; border-bottom:1px solid rgba(160,140,255,0.18); }
+.mobile-menu a, .mobile-menu button{ color:#fff; border-color:rgba(160,140,255,0.18); }
+.mobile-menu button.nav-cta{ border:none; }
+
+/* hero, marquee and the sections that show the 3D scene: deep purple-blue space */
+.hero{
+  background:
+    radial-gradient(45% 45% at 78% 22%, rgba(122,77,255,0.5), transparent 65%),
+    radial-gradient(40% 45% at 10% 85%, rgba(194,77,255,0.28), transparent 68%),
+    radial-gradient(35% 35% at 52% 58%, rgba(77,210,255,0.14), transparent 70%),
+    linear-gradient(172deg, #241068 0%, #120a45 42%, #05030f 100%);
+}
+.scent{
+  --bx:72%;
+  background:
+    radial-gradient(52% 58% at var(--bx) 42%, color-mix(in srgb, var(--g, #7a4dff) 48%, transparent), transparent 72%),
+    radial-gradient(46% 50% at calc(100% - var(--bx)) 88%, color-mix(in srgb, var(--c1, #6d3bff) 38%, transparent), transparent 74%),
+    linear-gradient(165deg, #1a0f4d 0%, #0d0830 48%, #05030f 100%);
+}
+.scent.flip{ --bx:28%; }
+.cta{
+  background:
+    radial-gradient(55% 60% at 50% 0%, rgba(122,77,255,0.5), transparent 68%),
+    radial-gradient(40% 50% at 12% 100%, rgba(194,77,255,0.3), transparent 70%),
+    radial-gradient(40% 50% at 92% 90%, rgba(77,210,255,0.18), transparent 70%),
+    linear-gradient(180deg, #2a1a7a 0%, #150c4a 55%, #05030f 100%);
+}
+
+/* the sections without a roll-on sit ABOVE the 3D scene and cover it: nothing busy behind the text */
+.intro, .proof, .range, .depth-marquee, footer{ position:relative; z-index:2; }
+.intro{ background:linear-gradient(180deg, #05030f 0%, #0b0727 100%); }
+.proof{ background:linear-gradient(180deg, #0b0727 0%, #120a38 100%); border:none; }
+.range{
+  background:
+    radial-gradient(60% 40% at 50% 0%, rgba(122,77,255,0.22), transparent 70%),
+    linear-gradient(180deg, #0b0727 0%, #07041a 100%);
+}
+footer{ background:#04030f; }
+.depth-marquee{
+  background:
+    radial-gradient(70% 90% at 50% 40%, rgba(122,77,255,0.38), transparent 70%),
+    linear-gradient(180deg, #05030f 0%, #1a0f4d 40%, #2a1a7a 62%, #05030f 100%);
+}
+.dm-row.far{ -webkit-text-stroke-color:rgba(160,140,255,0.32); }
+.dm-row.mid{ color:rgba(170,150,255,0.55); }
+.dm-haze{ background:linear-gradient(180deg, rgba(5,3,15,0) 0%, rgba(5,3,15,0.6) 48%, rgba(5,3,15,0) 74%); }
+
+/* text on the now-dark sections is light, so it takes the dark outline like the rest */
+.intro h2, .intro p{ color:#f4f1ff; }
+.intro .kicker, .range .kicker{ color:#b9a8ff; }
+.intro p{ color:rgba(240,235,255,0.9); }
+.proof .big{ color:#cbbcff; }
+.proof .cap{ color:rgba(240,235,255,0.82); }
+.intro h2, .intro p, .intro .kicker, .proof .big, .proof .cap, header .nav-links a{
+  -webkit-text-stroke:0.07em var(--stroke-dark);
+  paint-order:stroke fill;
+}
+.intro h2, .proof .big{ -webkit-text-stroke-width:0.04em; text-shadow:0 6px 30px rgba(122,77,255,0.35); }
+.range-card{ background:#0b0727; }
+.range-card:hover{ background:#150e40; }
+.range-grid{ background:rgba(160,140,255,0.14); }
+.scent .bg-word{ color:rgba(255,255,255,0.06); }
+.btn-primary{ color:#2a1a7a; }
+
+/* loading screen and its panel in the same palette */
+.loader{
+  background:
+    radial-gradient(60% 50% at 50% 40%, rgba(122,77,255,0.45), transparent 70%),
+    radial-gradient(40% 40% at 85% 85%, rgba(77,210,255,0.2), transparent 70%),
+    radial-gradient(35% 35% at 10% 90%, rgba(194,77,255,0.28), transparent 70%),
+    linear-gradient(175deg, #241068 0%, #0d0830 55%, #04030f 100%);
+}
+.intro-panel{
+  background:
+    radial-gradient(70% 90% at 50% 0%, rgba(160,140,255,0.5), transparent 70%),
+    linear-gradient(170deg, #4a2bd0 0%, #1a0f4d 55%, #07041a 100%);
+  border-color:rgba(160,140,255,0.4); box-shadow:0 30px 120px rgba(4,3,15,0.85);
+}
+.loader-hint{ color:#cbbcff; }
+.ascii-footer{ border-color:rgba(160,140,255,0.2); background:radial-gradient(60% 90% at 50% 0%, rgba(122,77,255,0.25), transparent 70%), rgba(255,255,255,0.03); }
+.ascii-fallback, .ascii-hint{ color:#cbbcff; }
+.sketch{ filter:drop-shadow(0 0 10px rgba(160,140,255,0.55)); opacity:0.6; }
+.range::before, .depth-marquee::after{ opacity:0.85; }
+@media (max-width: 860px){ .sketch{ opacity:0.4; } }

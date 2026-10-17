@@ -12,7 +12,7 @@ const ROWS = [
  *  faint and blurred; the near row is crisp and fast; blue haze sits between them. */
 export default function DepthMarquee() {
   return (
-    <section className="depth-marquee" aria-label="TAG ticker" data-world="#1328a8" data-haze="0.5" data-space="1">
+    <section className="depth-marquee" aria-label="TAG ticker" data-world="#1a0f4d" data-haze="0.5" data-space="1">
       <div className="dm-stage">
         {ROWS.map((r) => (
           <div key={r.cls} className={`dm-row ${r.cls} ${r.dir}`} aria-hidden="true">

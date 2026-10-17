@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { makeLabelTexture } from "@/lib/bottleLabel";
-import { driver } from "@/lib/lenisDriver";
 import { EVT } from "@/lib/events";
 
 const CAM_Z = 20;
@@ -24,17 +23,10 @@ const CIRCLES: [number, number, number][] = [
 // starfield streaks that fly out of the middle, far behind everything; they stretch when you scroll fast
 const STAR_N = 480;
 const STAR_Z = -26;
-const STAR_COLORS = ["#9fd4ff", "#ffffff", "#7dd3ff", "#9db8ff", "#c9a6ff", "#ff8fb8", "#ffc46b", "#6fe8c0"];
+const STAR_COLORS = ["#cbbcff", "#ffffff", "#9db8ff", "#b58cff", "#7dd3ff", "#ff9ad5", "#ffd9a0", "#8ff0d0"];
 const STAR_PICK = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7]; // weighted towards the blues
 // big soft glows far behind the stars: this is what makes the background read as deep space
-const NEB = [
-  { x: -12, y: 6, z: -34, size: 46, col: "#2244ff", ph: 0.3, op: 0.26 },
-  { x: 14, y: -5, z: -42, size: 60, col: "#7d3bff", ph: 1.2, op: 0.22 },
-  { x: 2, y: 9, z: -52, size: 70, col: "#00b7ff", ph: 2.1, op: 0.2 },
-  { x: -16, y: -10, z: -48, size: 56, col: "#ff4f9a", ph: 3.0, op: 0.13 },
-  { x: 18, y: 12, z: -58, size: 80, col: "#2a8be8", ph: 4.2, op: 0.22 },
-  { x: -4, y: -14, z: -62, size: 84, col: "#1fb583", ph: 5.1, op: 0.11 },
-];
+const NEB: { x: number; y: number; z: number; size: number; col: string; ph: number; op: number }[] = []; // glows now live in the page background (cheaper)
 
 const FX_TYPES = ["tag", "drop", "bolt", "sparkle", "shield", "leaf", "bubble", "petal"] as const;
 type FxType = (typeof FX_TYPES)[number];
@@ -52,8 +44,8 @@ const FX_PARAMS: Record<FxType, { fall: number; sway: number; amp: number; spin:
 };
 
 type Colors = { body: string; ball: string; base: string; trim: string };
-type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string; fx: number };
-type World = { el: HTMLElement; color: THREE.Color; haze: number; space: number };
+type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string; fx: number; top: number; left: number; w: number; h: number };
+type World = { el: HTMLElement; color: THREE.Color; haze: number; space: number; top: number; bottom: number };
 type BgSpec = {
   fx: number;
   fy: number;
@@ -404,6 +396,12 @@ function Scene() {
     init: false,
     fxActive: 0,
     ready: false,
+    ema: 16,
+    slow: 0,
+    lowQ: false,
+    starX: 0,
+    starY: 0,
+    starHole: 1.3,
     warp: 0,
     burst: 0,
     starPhase: 0,
@@ -462,6 +460,10 @@ function Scene() {
       deep: el.dataset.deep ?? "#0d4fa8",
       label: el.dataset.label ?? "TAG",
       fx: Math.max(0, FX_TYPES.indexOf((el.dataset.fx ?? "drop") as FxType)),
+      top: 0,
+      left: 0,
+      w: 0,
+      h: 0,
     }));
     textures.current = slots.current.map((s) => makeLabelTexture(s.label, s.accent));
 
@@ -470,11 +472,43 @@ function Scene() {
       color: new THREE.Color(el.dataset.world ?? "#2244ff"),
       haze: parseFloat(el.dataset.haze ?? "1"),
       space: parseFloat(el.dataset.space ?? "0"),
+      top: 0,
+      bottom: 0,
     }));
 
+    // measure where everything is once (and again when the layout changes) instead of every frame
+    const measure = () => {
+      const sy = window.scrollY;
+      for (const sl of slots.current) {
+        const r = sl.el.getBoundingClientRect();
+        sl.top = r.top + sy;
+        sl.left = r.left;
+        sl.w = r.width;
+        sl.h = r.height;
+      }
+      for (const w of worlds.current) {
+        const r = w.el.getBoundingClientRect();
+        w.top = r.top + sy;
+        w.bottom = r.bottom + sy;
+      }
+    };
+    measure();
+    let measureTimer = 0;
+    const remeasure = () => {
+      window.clearTimeout(measureTimer);
+      measureTimer = window.setTimeout(measure, 120);
+    };
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(document.body);
+    window.addEventListener("resize", remeasure);
+    window.addEventListener("load", remeasure);
+    window.addEventListener(EVT.entered, remeasure);
+    const lateMeasure = window.setTimeout(measure, 900);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+
     const small = window.innerWidth < 700;
-    fxCount.current = small ? 16 : FX_COUNT;
-    starCount.current = small ? 260 : STAR_N;
+    fxCount.current = small ? 7 : 14;
+    starCount.current = small ? 200 : 360;
     const sm = starMesh.current;
     if (sm) {
       sm.count = starCount.current;
@@ -493,8 +527,8 @@ function Scene() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const list = slots.current;
     const pool = list.length > 1 ? list.slice(1) : list;
-    const nHang = reduce ? 0 : small ? 5 : 8;
-    const nDrift = reduce ? 0 : small ? 1 : 3;
+    const nHang = reduce ? 0 : small ? 3 : 5;
+    const nDrift = reduce ? 0 : small ? 1 : 2;
     const perLayer = Math.max(1, Math.ceil(nHang / 3));
     const rnd = mulberry32(11);
     const specs: BgSpec[] = [];
@@ -593,16 +627,19 @@ function Scene() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       document.body.style.cursor = "";
+      ro.disconnect();
+      window.clearTimeout(measureTimer);
+      window.clearTimeout(lateMeasure);
+      window.removeEventListener("resize", remeasure);
+      window.removeEventListener("load", remeasure);
+      window.removeEventListener(EVT.entered, remeasure);
       textures.current.forEach((t) => t.dispose());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFrame((state) => {
-    // 1. advance smooth scroll first, so everything below reads this frame's scroll position
     const now = performance.now();
-    driver.lastExternal = now;
-    if (driver.lenis) driver.lenis.raf(now);
 
     const s = st.current;
     const g = mainGroup.current;
@@ -611,6 +648,15 @@ function Scene() {
 
     const dt = s.last ? clamp((now - s.last) / 1000, 0.001, 0.05) : 0.016;
     s.last = now;
+    s.ema += (dt * 1000 - s.ema) * 0.05;
+    if (!s.lowQ) {
+      s.slow = s.ema > 26 ? s.slow + dt : Math.max(0, s.slow - dt);
+      if (s.slow > 2.5) {
+        s.lowQ = true;
+        state.gl.setPixelRatio(1);
+        starCount.current = Math.min(starCount.current, 180);
+      }
+    }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const aspect = vw / vh;
@@ -622,14 +668,15 @@ function Scene() {
     // 2. which fragrance slot is nearest the middle of the screen
     let best = 0;
     let bestDist = Infinity;
-    let bestRect = list[0].el.getBoundingClientRect();
+    let bestRect = { top: list[0].top - scrollY, left: list[0].left, width: list[0].w, height: list[0].h };
     for (let i = 0; i < list.length; i++) {
-      const r = list[i].el.getBoundingClientRect();
-      const d = Math.abs(r.top + r.height / 2 - vh / 2);
+      const sl = list[i];
+      const top = sl.top - scrollY;
+      const d = Math.abs(top + sl.h / 2 - vh / 2);
       if (d < bestDist) {
         bestDist = d;
         best = i;
-        bestRect = r;
+        bestRect = { top, left: sl.left, width: sl.w, height: sl.h };
       }
     }
     const active = bestDist < 0.6 * vh;
@@ -671,7 +718,7 @@ function Scene() {
           s.mode = "in";
           s.rotY = 0;
           const turns = 0;
-          s.rotTarget = (s.dir > 0 ? Math.ceil(turns) + 1 : Math.floor(turns) - 1) * TWO_PI;
+          s.rotTarget = (s.dir > 0 ? Math.ceil(turns + 0.4) : Math.floor(turns - 0.4)) * TWO_PI;
           s.rotY = s.rotTarget - s.dir * TWO_PI * 1.2;
         } else if (best !== s.index) {
           // leaving: slide out of the side it is on, spinning faster and faster
@@ -689,8 +736,8 @@ function Scene() {
     if (s.mode === "out") {
       s.pending = best;
       targetX = s.outDir * (offX + slotH * 0.8);
-      rate = 9;
-      s.omega = Math.min(22, s.omega + 60 * dt);
+      rate = 6.5;
+      s.omega = Math.min(12, s.omega + 34 * dt);
       s.rotY += s.dir * s.omega * dt;
       if (Math.abs(s.x) >= offX * 0.97) {
         // it has left the screen: swap to the new fragrance, then spin in from the side it will sit on
@@ -699,9 +746,9 @@ function Scene() {
         s.x = (slotX >= 0 ? 1 : -1) * offX;
         s.mode = "in";
         const turns = s.rotY / TWO_PI;
-        s.rotTarget = (s.dir > 0 ? Math.ceil(turns) + 1 : Math.floor(turns) - 1) * TWO_PI;
+        s.rotTarget = (s.dir > 0 ? Math.ceil(turns + 0.4) : Math.floor(turns - 0.4)) * TWO_PI;
         targetX = slotX;
-        rate = 7;
+        rate = 5.5;
       }
     } else if (s.mode === "in") {
       if (best !== s.index) {
@@ -709,7 +756,7 @@ function Scene() {
         s.index = best;
       }
       targetX = slotX;
-      rate = 7;
+      rate = 5.5;
       s.rotY += (s.rotTarget - s.rotY) * ease(5.5);
       if (Math.abs(s.x - slotX) < slotH * 0.05 && Math.abs(s.rotTarget - s.rotY) < 0.06) {
         s.mode = "idle";
@@ -731,9 +778,9 @@ function Scene() {
     const h = halo.current;
     const hm = haloMat.current;
     if (h && hm) {
-      h.visible = s.glow > 0.01;
+      h.visible = s.glow > 0.01 && !s.lowQ;
       h.position.set(s.x, s.y, -2.5);
-      h.scale.setScalar(s.h * 1.7 + 0.0001);
+      h.scale.setScalar(s.h * 1.45 + 0.0001);
       hm.color.lerp(haloTarget.current, 0.12);
       hm.opacity = 0.6 * s.glow;
     }
@@ -741,8 +788,7 @@ function Scene() {
     // 4. atmosphere: distant things fade into the colour of the section behind them
     const ws = worlds.current;
     for (let i = 0; i < ws.length; i++) {
-      const r = ws[i].el.getBoundingClientRect();
-      if (r.top <= vh / 2 && r.bottom > vh / 2) {
+      if (ws[i].top - scrollY <= vh / 2 && ws[i].bottom - scrollY > vh / 2) {
         fogTarget.current.copy(ws[i].color);
         s.farTarget = CAM_Z + 8 + 18 * ws[i].haze;
         s.spaceTarget = ws[i].space;
@@ -956,11 +1002,11 @@ function Scene() {
       const mesh = fxMeshes.current[k];
       const mat = fxMats.current[k];
       if (!mesh || !mat) continue;
-      fxAlpha.current[k] += ((k === s.fxActive ? 1 : 0) - fxAlpha.current[k]) * ease(3);
+      fxAlpha.current[k] += ((k === s.fxActive && !s.lowQ ? 1 : 0) - fxAlpha.current[k]) * ease(3);
       const a = fxAlpha.current[k];
       mesh.visible = a > 0.02;
       if (!mesh.visible) continue;
-      mat.opacity = 0.8 * a;
+      mat.opacity = 0.55 * a;
       mat.color.lerp(fxTint.current, 0.08);
       const P = FX_PARAMS[FX_TYPES[k]];
       const data = fxData[k];
@@ -1002,9 +1048,15 @@ function Scene() {
         const halfHS = TAN * distS;
         const halfWS = halfHS * aspect;
         const maxD = Math.hypot(halfWS, halfHS) * 1.2;
-        const hole = 1.3;
+        const kS = distS / CAM_Z;
+        const onBottle = active && s.glow > 0.2;
+        s.starX += ((onBottle ? s.x * kS : 0) - s.starX) * ease(4);
+        s.starY += ((onBottle ? s.y * kS : 0) - s.starY) * ease(4);
+        s.starHole += ((onBottle ? clamp(s.h * kS * 0.42, 1.3, 7.5) : 1.3) - s.starHole) * ease(4);
+        const hole = s.starHole;
         const w = Math.min(s.warp, 1.6);
         const n = starCount.current;
+        sm.count = n;
         for (let i = 0; i < n; i++) {
           const sd = starData[i];
           const travel = (((s.starPhase * 4 - sd.offset) % 1) + 1) % 1;
@@ -1013,7 +1065,7 @@ function Scene() {
           const tail = Math.max(hole, head - len);
           const cd = (head + tail) / 2;
           const ramp = clamp((head - hole) / 4, 0, 1);
-          dummy.position.set(Math.cos(sd.a) * cd, Math.sin(sd.a) * cd, STAR_Z);
+          dummy.position.set(s.starX + Math.cos(sd.a) * cd, s.starY + Math.sin(sd.a) * cd, STAR_Z);
           dummy.rotation.set(0, 0, sd.a);
           dummy.scale.set(Math.max(head - tail, 0.001), sd.w * (0.5 + travel * 0.9) * ramp, 1);
           dummy.updateMatrix();
@@ -1156,7 +1208,7 @@ export default function SceneCanvas() {
   return (
     <Canvas
       flat
-      dpr={[1, 1.5]}
+      dpr={[1, 1.25]}
       camera={{ fov: FOV, position: [0, 0, CAM_Z], near: 0.1, far: 200 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       style={{

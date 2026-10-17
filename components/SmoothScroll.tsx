@@ -12,11 +12,7 @@ import { driver } from "@/lib/lenisDriver";
  */
 export default function SmoothScroll() {
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.1,
-      easing: (t: number) => 1 - Math.pow(1 - t, 3),
-      smoothWheel: true,
-    });
+    const lenis = new Lenis({ lerp: 0.085, smoothWheel: true, wheelMultiplier: 0.9 });
     driver.lenis = lenis;
 
     let id = 0;
