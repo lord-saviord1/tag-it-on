@@ -16,17 +16,20 @@ Sections without a roll-on (the idea, the marquee, the range, the proof, the foo
 that sit over the 3D scene. The scene stops drawing entirely while you are inside them, and starts again just
 before you reach the hero, a fragrance section or the final call to action.
 
-## Using the real roll-on model later
-The bottle is currently built in code. To use the real shape and details:
+## The real roll-on model (already in)
+The site now uses the real bottle shape and the real label art:
 
-1. **Get a model.** Best: ask Imperio / TAG for the 3D file of the bottle. Otherwise generate one from the product
-   photo with an image-to-3D tool (Meshy, Tripo or Rodin), or model it in Blender. Check the tool's licence for commercial use.
-2. **Keep the original** somewhere safe (do not overwrite it).
-3. **Name the parts** in the file: `body`, `ball`, `base`, `collar`, `label`. Then each fragrance can recolour its own parts.
-4. **Shrink it** (keep it under about 2 MB and 30,000 triangles):
-   `npx @gltf-transform/cli optimize roll-on.glb public/models/roll-on.glb --compress meshopt --texture-compress webp`
-5. Put the result in `public/models/` and send it to me. I will load it with `useGLTF` (preloaded), recolour the named
-   parts per fragrance, and keep the current procedural bottle as a fallback.
+- `public/models/roll-on-hi.glb` (about 27,000 triangles) is the main roll-on, `roll-on-lo.glb` (about 4,500) is used for the small background roll-ons.
+- `public/textures/<fragrance>.webp` are the front of each official product render, wrapped onto the model (the back of the bottle gets the plain shell colour).
+- If the model or textures fail to load, the site falls back to the bottle built in code.
+
+How they were made: your `base.fbx` was rebuilt as a clean, light mesh (the original is over 130,000 vertices, far too heavy for a web page), keeping its outline,
+and the shape was scaled to match the real renders (its outline sits within about 2% of them). To redo it with a new sculpt or new renders:
+
+    pip install numpy scipy opencv-python pillow
+    python3 tools/build_roll_on.py <folder containing base.fbx and the TAG*.png renders>
+
+`3x-whitening.webp` is built too but not used yet (the site shows seven fragrances).
 
 ## Left out on purpose
 - **Post-processing (bloom, vignette, depth of field).** Each effect adds a full-screen pass. On an integrated laptop GPU

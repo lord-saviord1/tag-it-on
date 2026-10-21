@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
 import { makeLabelTexture } from "@/lib/bottleLabel";
 import { EVT } from "@/lib/events";
@@ -30,6 +31,9 @@ const STAR_PICK = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7]; // weighted towards t
 const NEB: { x: number; y: number; z: number; size: number; col: string; ph: number; op: number }[] = []; // glows now live in the page background (cheaper)
 
 const WHITE = new THREE.Color("#ffffff");
+// the real roll-on model and one texture per fragrance (made from the official product renders)
+const TEX_SLUGS = ["cool-breeze", "turbo", "whitening", "powerful-defense", "fresh-mint", "sensitive-skin", "romantic-charm"];
+type Assets = { hi: THREE.BufferGeometry; lo: THREE.BufferGeometry; tex: Record<string, THREE.Texture> };
 
 const FX_TYPES = ["tag", "drop", "bolt", "sparkle", "shield", "leaf", "bubble", "petal"] as const;
 type FxType = (typeof FX_TYPES)[number];
@@ -47,7 +51,7 @@ const FX_PARAMS: Record<FxType, { fall: number; sway: number; amp: number; spin:
 };
 
 type Colors = { body: string; ball: string; base: string; trim: string };
-type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string; fx: number; top: number; left: number; w: number; h: number };
+type Slot = Colors & { el: HTMLElement; accent: string; deep: string; label: string; fx: number; tex: string; top: number; left: number; w: number; h: number };
 type World = { el: HTMLElement; color: THREE.Color; haze: number; space: number; top: number; bottom: number };
 type BgSpec = {
   fx: number;
@@ -63,6 +67,7 @@ type BgSpec = {
   tilt: number;
   colors: Colors;
   map: THREE.Texture;
+  texSlug: string;
 };
 type Phys = { dx: number; dy: number; vx: number; vy: number; rot: number; spinV: number; ang: number; angV: number };
 type ScreenInfo = { sx: number; sy: number; hw: number; hh: number; z: number };
@@ -464,6 +469,64 @@ function Scene() {
     };
   }, []);
 
+  const [assets, setAssets] = useState<Assets | null>(null);
+  const assetsRef = useRef<Assets | null>(null);
+  const assetsStatus = useRef<"loading" | "ready" | "failed">("loading");
+  const mainRealMat = useRef<THREE.MeshPhysicalMaterial>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const loader = new GLTFLoader();
+        const texLoader = new THREE.TextureLoader();
+        const geoOf = async (url: string) => {
+          const gltf = await loader.loadAsync(url);
+          const found: THREE.BufferGeometry[] = [];
+          gltf.scene.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (m.isMesh) found.push(m.geometry);
+          });
+          if (found.length === 0) throw new Error("no mesh in " + url);
+          return found[0];
+        };
+        const [hi, lo] = await Promise.all([geoOf("/models/roll-on-hi.glb"), geoOf("/models/roll-on-lo.glb")]);
+        const tex: Record<string, THREE.Texture> = {};
+        await Promise.all(
+          TEX_SLUGS.map(async (slug) => {
+            const t = await texLoader.loadAsync(`/textures/${slug}.webp`);
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.flipY = false; // the model's UVs use the glTF convention
+            t.anisotropy = 4;
+            tex[slug] = t;
+          })
+        );
+        if (!alive) return;
+        const a = { hi, lo, tex };
+        assetsRef.current = a;
+        assetsStatus.current = "ready";
+        setAssets(a);
+      } catch {
+        assetsStatus.current = "failed"; // keep the roll-on built in code
+      }
+    })();
+    return () => {
+      alive = false;
+      const a = assetsRef.current;
+      if (a) {
+        a.hi.dispose();
+        a.lo.dispose();
+        Object.values(a.tex).forEach((t) => t.dispose());
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // the model arrived after the first look was chosen: give it the right fragrance
+    if (assets && st.current.index >= 0) applyLook(st.current.index);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets]);
+
   /** Put the main roll-on into the look of slot `idx` (colours, label, halo). */
   const applyLook = (idx: number) => {
     const sl = slots.current[idx];
@@ -472,6 +535,15 @@ function Scene() {
     ballMat.current?.color.set(sl.ball);
     baseMat.current?.color.set(sl.base);
     trimMat.current?.color.set(sl.trim);
+    const A = assetsRef.current;
+    const real = mainRealMat.current;
+    if (A && real) {
+      const t = A.tex[sl.tex];
+      if (t) {
+        real.map = t;
+        real.emissiveMap = t;
+      }
+    }
     const lm = labelMat.current;
     if (lm) {
       lm.map = textures.current[idx] ?? null;
@@ -510,6 +582,7 @@ function Scene() {
       deep: el.dataset.deep ?? "#0d4fa8",
       label: el.dataset.label ?? "TAG",
       fx: Math.max(0, FX_TYPES.indexOf((el.dataset.fx ?? "drop") as FxType)),
+      tex: el.dataset.tex ?? "cool-breeze",
       top: 0,
       left: 0,
       w: 0,
@@ -602,6 +675,7 @@ function Scene() {
         tilt: (rnd() - 0.5) * 0.6,
         colors: { body: slot.body, ball: slot.ball, base: slot.base, trim: slot.trim },
         map: tex,
+        texSlug: slot.tex,
       });
     };
     for (let i = 0; i < nHang; i++) make(i % 3, Math.floor(i / 3), i, 0);
@@ -1172,7 +1246,7 @@ function Scene() {
       mt.opacity = nb.op * s.space;
     }
 
-    if (!s.ready) {
+    if (!s.ready && assetsStatus.current !== "loading") {
       s.ready = true;
       window.__tagSceneReady = true;
       window.dispatchEvent(new Event(EVT.sceneReady));
@@ -1269,13 +1343,46 @@ function Scene() {
               bgRefs.current[i] = el;
             }}
           >
-            <BottleParts geo={loGeo} colors={b.colors} map={b.map} />
+            {assets ? (
+              <mesh geometry={assets.lo}>
+                <meshStandardMaterial
+                  color="#555555"
+                  map={assets.tex[b.texSlug]}
+                  emissive="#ffffff"
+                  emissiveMap={assets.tex[b.texSlug]}
+                  emissiveIntensity={0.8}
+                  roughness={0.45}
+                  metalness={0}
+                  envMapIntensity={0.4}
+                />
+              </mesh>
+            ) : (
+              <BottleParts geo={loGeo} colors={b.colors} map={b.map} />
+            )}
           </group>
         ))}
       </group>
 
       <group ref={mainGroup}>
-        <BottleParts geo={hiGeo} refs={refs} fancy />
+        {assets ? (
+          <mesh geometry={assets.hi}>
+            <meshPhysicalMaterial
+              ref={mainRealMat}
+              color="#555555"
+              map={assets.tex["whitening"]}
+              emissive="#ffffff"
+              emissiveMap={assets.tex["whitening"]}
+              emissiveIntensity={0.8}
+              roughness={0.4}
+              metalness={0}
+              clearcoat={0.4}
+              clearcoatRoughness={0.2}
+              envMapIntensity={0.5}
+            />
+          </mesh>
+        ) : (
+          <BottleParts geo={hiGeo} refs={refs} fancy />
+        )}
       </group>
     </>
   );

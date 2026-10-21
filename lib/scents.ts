@@ -18,11 +18,15 @@ export type Scent = {
   flip?: boolean;
 };
 
-const facts = [
-  { num: "UP TO 48H", label: "PROTECTION" },
-  { num: "ULTRA DRY", label: "QUICK-DRY FORMULA" },
-  { num: "ROLL-ON", label: "FORMAT" },
+const makeFacts = (third: { num: string; label: string }) => [
+  { num: "48H", label: "NON-STOP EFFICACY" },
+  { num: "50G", label: "ROLL-ON DEODORANT" },
+  third,
 ];
+// what is printed on each real label
+const standard = { num: "ANTI-ODOR", label: "ANTI-PERSPIRANT" };
+const whiteningClaim = { num: "VITAMIN C", label: "LICORICE · ALCOHOL FREE" };
+const sensitiveClaim = { num: "ALCOHOL FREE", label: "SENSITIVE PROTECT" };
 
 export const scents: Scent[] = [
   {
@@ -40,7 +44,7 @@ export const scents: Scent[] = [
     accent: "#2a8be8",
     accentDeep: "#0d4fa8",
     glow: "#5fd0ff",
-    facts,
+    facts: makeFacts(standard),
   },
   {
     slug: "turbo",
@@ -57,7 +61,7 @@ export const scents: Scent[] = [
     accent: "#262932",
     accentDeep: "#07080b",
     glow: "#ff3b30",
-    facts,
+    facts: makeFacts(standard),
     flip: true,
   },
   {
@@ -75,7 +79,7 @@ export const scents: Scent[] = [
     accent: "#d81b57",
     accentDeep: "#7d0a2c",
     glow: "#ff9ab8",
-    facts,
+    facts: makeFacts(whiteningClaim),
   },
   {
     slug: "powerful-defense",
@@ -92,7 +96,7 @@ export const scents: Scent[] = [
     accent: "#ff9a2e",
     accentDeep: "#d4540f",
     glow: "#ffd24d",
-    facts,
+    facts: makeFacts(standard),
     flip: true,
   },
   {
@@ -110,7 +114,7 @@ export const scents: Scent[] = [
     accent: "#1fb583",
     accentDeep: "#0a6a49",
     glow: "#7dffd0",
-    facts,
+    facts: makeFacts(standard),
   },
   {
     slug: "sensitive-skin",
@@ -127,7 +131,7 @@ export const scents: Scent[] = [
     accent: "#8f4fb5",
     accentDeep: "#4a1a66",
     glow: "#d9a6ff",
-    facts,
+    facts: makeFacts(sensitiveClaim),
     flip: true,
   },
   {
@@ -145,7 +149,7 @@ export const scents: Scent[] = [
     accent: "#ff7aa6",
     accentDeep: "#b02a5b",
     glow: "#ffc2d9",
-    facts,
+    facts: makeFacts(standard),
   },
 ];
 
