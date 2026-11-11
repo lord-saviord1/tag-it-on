@@ -5,7 +5,7 @@ Builds the web-ready TAG roll-on from the sculpt (base.fbx) and the official pro
   python3 tools/build_roll_on.py <folder with base.fbx and the TAG*.png renders>
 
 Writes:
-  public/models/roll-on-hi.glb   (about 27k triangles, used for the main roll-on)
+  public/models/roll-on-mid.glb  (about 12k triangles, used for the main roll-on)
   public/models/roll-on-lo.glb   (about 4k triangles, used for the far background roll-ons)
   public/textures/<fragrance>.webp  (the front of each real product render, wrapped onto the model)
 
@@ -256,7 +256,7 @@ if __name__ == "__main__":
     V = read_fbx_vertices(os.path.join(SRC, "base.fbx"))
     ratio = target_ratio()
     print("real product width / height:", round(ratio, 3), " sculpt vertices:", len(V))
-    for name, (nt, ny, st, sy) in {"hi": (96, 140, 1.0, 1.0), "lo": (40, 56, 0.6, 0.6)}.items():
+    for name, (nt, ny, st, sy) in {"mid": (64, 100, 0.8, 0.8), "lo": (40, 56, 0.6, 0.6)}.items():
         R, cx, cz = resample(V, nt, ny, ratio, st, sy)
         pos, nrm, tris = build_mesh(R, cx, cz)
         uv = make_uv(pos, nrm)

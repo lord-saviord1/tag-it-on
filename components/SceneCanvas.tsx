@@ -23,7 +23,8 @@ const CIRCLES: [number, number, number][] = [
 ];
 
 // starfield streaks that fly out of the middle, far behind everything; they stretch when you scroll fast
-const STAR_N = 480;
+const STAR_N = 240;
+const FX_ENABLED = false; // the falling shapes are switched off: calmer page, fewer things drawn
 const STAR_Z = -26;
 const STAR_COLORS = ["#cbbcff", "#ffffff", "#9db8ff", "#b58cff", "#7dd3ff", "#ff9ad5", "#ffd9a0", "#8ff0d0"];
 const STAR_PICK = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7]; // weighted towards the blues
@@ -32,7 +33,7 @@ const NEB: { x: number; y: number; z: number; size: number; col: string; ph: num
 
 const WHITE = new THREE.Color("#ffffff");
 // the real roll-on model and one texture per fragrance (made from the official product renders)
-const TEX_SLUGS = ["cool-breeze", "turbo", "whitening", "powerful-defense", "fresh-mint", "sensitive-skin", "romantic-charm"];
+const TEX_SLUGS = ["cool-breeze", "turbo", "whitening", "powerful-defense", "fresh-mint", "sensitive-skin", "romantic-charm", "3x-whitening"];
 type Assets = { hi: THREE.BufferGeometry; lo: THREE.BufferGeometry; tex: Record<string, THREE.Texture> };
 
 const FX_TYPES = ["tag", "drop", "bolt", "sparkle", "shield", "leaf", "bubble", "petal"] as const;
@@ -325,7 +326,7 @@ function Scene() {
   const hiGeo = useMemo(() => buildGeos(64), []);
   const loGeo = useMemo(() => buildGeos(28), []);
   const radialTex = useMemo(() => makeRadialTexture(), []);
-  const fxTex = useMemo(() => FX_TYPES.map((t) => makeShapeTexture(t)), []);
+  const fxTex = useMemo(() => (FX_ENABLED ? FX_TYPES.map((t) => makeShapeTexture(t)) : []), []);
   const fxData = useMemo(
     () =>
       FX_TYPES.map((_, k) => {
@@ -490,7 +491,7 @@ function Scene() {
           if (found.length === 0) throw new Error("no mesh in " + url);
           return found[0];
         };
-        const [hi, lo] = await Promise.all([geoOf("/models/roll-on-hi.glb"), geoOf("/models/roll-on-lo.glb")]);
+        const [hi, lo] = await Promise.all([geoOf("/models/roll-on-mid.glb"), geoOf("/models/roll-on-lo.glb")]);
         const tex: Record<string, THREE.Texture> = {};
         await Promise.all(
           TEX_SLUGS.map(async (slug) => {
@@ -631,7 +632,7 @@ function Scene() {
 
     const small = window.innerWidth < 700;
     fxCount.current = small ? 7 : 14;
-    starCount.current = small ? 200 : 360;
+    starCount.current = small ? 110 : 220;
     const sm = starMesh.current;
     if (sm) {
       sm.count = starCount.current;
@@ -650,8 +651,8 @@ function Scene() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const list = slots.current;
     const pool = list.length > 1 ? list.slice(1) : list;
-    const nHang = reduce ? 0 : small ? 3 : 5;
-    const nDrift = reduce ? 0 : small ? 1 : 2;
+    const nHang = reduce ? 0 : small ? 0 : 2;
+    const nDrift = 0;
     const perLayer = Math.max(1, Math.ceil(nHang / 3));
     const rnd = mulberry32(11);
     const specs: BgSpec[] = [];
@@ -870,7 +871,7 @@ function Scene() {
         } else if (best !== s.index) {
           // leaving: slide out of the side it is on, spinning faster and faster
           s.mode = "out";
-          s.burst = Math.max(s.burst, 0.9); // warp the stars while the roll-on changes
+          s.burst = Math.max(s.burst, 0.35); // a gentle pulse in the stars while the roll-on changes
           s.pending = best;
           s.outDir = s.x >= 0 ? 1 : -1;
           s.omega = 4;
@@ -1186,7 +1187,7 @@ function Scene() {
 
     // 7. deep space: glow clouds far behind, and a starfield that streaks when you scroll or move between sections
     s.space += (s.spaceTarget - s.space) * ease(3);
-    const warpTarget = clamp(Math.abs(vel / dt) / 3000, 0, 1.2);
+    const warpTarget = clamp(Math.abs(vel / dt) / 7000, 0, 0.5);
     s.warp += (warpTarget + s.burst - s.warp) * ease(4);
     s.burst *= Math.exp(-1.4 * dt);
     s.starPhase += (0.025 + Math.min(s.warp, 1.8) * 0.9) * dt;
@@ -1205,7 +1206,7 @@ function Scene() {
         s.starY += ((onBottle ? s.y * kS : 0) - s.starY) * ease(4);
         s.starHole += ((onBottle ? clamp(s.h * kS * 0.42, 1.3, 7.5) : 1.3) - s.starHole) * ease(4);
         const hole = s.starHole;
-        const w = Math.min(s.warp, 1.6);
+        const w = Math.min(s.warp, 0.7);
         const n = starCount.current;
         sm.count = n;
         for (let i = 0; i < n; i++) {
@@ -1223,7 +1224,7 @@ function Scene() {
           sm.setMatrixAt(i, dummy.matrix);
         }
         sm.instanceMatrix.needsUpdate = true;
-        if (starMat.current) starMat.current.opacity = 0.95 * s.space;
+        if (starMat.current) starMat.current.opacity = 0.55 * s.space;
       }
     }
 
@@ -1312,7 +1313,7 @@ function Scene() {
         />
       </mesh>
 
-      {FX_TYPES.map((type, k) => (
+      {FX_ENABLED && FX_TYPES.map((type, k) => (
         <instancedMesh
           key={type}
           ref={(m) => {
@@ -1440,7 +1441,7 @@ export default function SceneCanvas() {
       flat
       dpr={[1, 1.25]}
       camera={{ fov: FOV, position: [0, 0, CAM_Z], near: 0.1, far: 200 }}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      gl={{ antialias: true, alpha: true, powerPreference: "default" }}
       style={{
         position: "fixed",
         inset: 0,

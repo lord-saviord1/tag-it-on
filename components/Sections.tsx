@@ -11,7 +11,7 @@ export function Story() {
         <p className="reveal">
           TAG is a roll-on deodorant from Imperio International, made for young Nigerians who want to
           look good, feel good and step out with confidence. It&apos;s premium, it&apos;s affordable,
-          and it comes in seven fragrances so you can pick the one that fits your mood. So instead of
+          and it comes in eight fragrances so you can pick the one that fits your mood. So instead of
           trolling someone, just TAG it on.
         </p>
       </div>
@@ -24,7 +24,7 @@ export function RangeGrid() {
     <section className="range" id="range" data-world="#0b0727" data-haze="0.3" data-space="0">
       <div className="wrap">
         <div className="kicker reveal">THE FULL RANGE</div>
-        <h2 className="reveal">Seven scents. One protection promise.</h2>
+        <h2 className="reveal">Eight scents. One protection promise.</h2>
         <div className="range-photo reveal">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

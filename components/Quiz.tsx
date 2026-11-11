@@ -13,8 +13,8 @@ const questions: { q: string; options: Option[] }[] = [
     options: [
       { label: "Lectures, errands, always moving", picks: ["powerful-defense", "turbo"] },
       { label: "Hot, crowded, outside all day", picks: ["cool-breeze", "fresh-mint"] },
-      { label: "Calm and low-key", picks: ["sensitive-skin", "whitening"] },
-      { label: "Dressed up, going out later", picks: ["romantic-charm", "whitening"] },
+      { label: "Calm and low-key", picks: ["sensitive-skin", "whitening", "3x-whitening"] },
+      { label: "Dressed up, going out later", picks: ["romantic-charm", "whitening", "3x-whitening"] },
     ],
   },
   {
@@ -23,14 +23,14 @@ const questions: { q: string; options: Option[] }[] = [
       { label: "Cold and sharp", picks: ["fresh-mint", "cool-breeze"] },
       { label: "Dark and bold", picks: ["turbo", "powerful-defense"] },
       { label: "Soft and sweet", picks: ["romantic-charm", "sensitive-skin"] },
-      { label: "Clean and bright", picks: ["whitening", "cool-breeze"] },
+      { label: "Clean and bright", picks: ["whitening", "3x-whitening", "cool-breeze"] },
     ],
   },
   {
     q: "What matters most to you?",
     options: [
       { label: "All-day protection", picks: ["powerful-defense", "turbo"] },
-      { label: "Gentle on my skin", picks: ["sensitive-skin", "whitening"] },
+      { label: "Gentle on my skin", picks: ["sensitive-skin", "whitening", "3x-whitening"] },
       { label: "Smelling amazing", picks: ["romantic-charm", "fresh-mint"] },
       { label: "Staying cool and dry", picks: ["cool-breeze", "fresh-mint"] },
     ],

@@ -151,6 +151,28 @@ export const scents: Scent[] = [
     glow: "#ffc2d9",
     facts: makeFacts(standard),
   },
+  {
+    slug: "3x-whitening",
+    fx: "sparkle",
+    index: "08",
+    name: "3X Whitening",
+    tagline: "Whitening care, alcohol free",
+    description:
+      "For people who want more from their underarm care. Alcohol free, with Vitamin C and niacinamide, and 48 hours of non-stop efficacy.",
+    body: "#f5f5f6",
+    ball: "#f7f7f8",
+    base: "#ffa31a",
+    trim: "#ffd27a",
+    accent: "#ff8a1f",
+    accentDeep: "#7a2f04",
+    glow: "#ffb04d",
+    facts: [
+      { num: "48H", label: "NON-STOP EFFICACY" },
+      { num: "50ML", label: "ROLL-ON DEODORANT" },
+      { num: "VITAMIN C", label: "NIACINAMIDE · ALCOHOL FREE" },
+    ],
+    flip: true,
+  },
 ];
 
 /** Blend two #rrggbb colours. Used to tell the 3D scene what colour each section's background is. */

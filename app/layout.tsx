@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   title: "TAG | Don't Troll, Just TAG It On",
   description:
-    "TAG Ultra Dry roll-on deodorant: seven fragrances, a quick-dry formula and up to 48 hours of protection. Don't Troll, Just TAG It On.",
+    "TAG Ultra Dry roll-on deodorant: eight fragrances, a quick-dry formula and 48 hours of non-stop efficacy. Don't Troll, Just TAG It On.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
